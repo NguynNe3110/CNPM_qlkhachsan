@@ -222,16 +222,23 @@ public class AdminDashboard extends JFrame {
         UIUtils.configureTable(table);
         UIUtils.hideColumn(table, 0);
 
-        // Tô màu theo trạng thái
+        // Tô màu theo trạng thái - đã tối ưu: load 1 lần thay vì gọi DB cho mỗi cell
+        java.util.Map<Integer, String> roomStatusCache = new java.util.HashMap<>();
+        for (Room r : roomDAO.getAll()) {
+            if (r.isEnable()) {
+                roomStatusCache.put(r.getId(), r.getStatus());
+            }
+        }
+        
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(JTable t, Object val,
                     boolean sel, boolean foc, int row, int col) {
                 Component c = super.getTableCellRendererComponent(t, val, sel, foc, row, col);
                 if (!sel && row < roomModel.getRowCount()) {
                     int rid = (int) roomModel.getValueAt(row, 0);
-                    Room r = roomDAO.getById(rid);
-                    if (r != null) {
-                        switch (r.getStatus()) {
+                    String status = roomStatusCache.get(rid);
+                    if (status != null) {
+                        switch (status) {
                             case "EMPTY":        c.setBackground(new Color(220, 255, 220)); break;
                             case "OCCUPIED":     c.setBackground(new Color(255, 220, 180)); break;
                             case "MAINTENANCE":  c.setBackground(new Color(255, 240, 180)); break;
@@ -634,12 +641,30 @@ public class AdminDashboard extends JFrame {
             "Tất cả", "Đang thuê (CHECKED_IN)", "Đã trả phòng (CHECKED_OUT)"
         });
         cbFilter.addActionListener(e -> {
+        cbFilter.addActionListener(e -> {
+            // Cache tất cả rooms, customers, accounts để tránh gọi DB nhiều lần
+            java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
+            for (Room r : roomDAO.getAll()) roomCache.put(r.getId(), r);
+            
+            java.util.Map<Integer, Customer> customerCache = new java.util.HashMap<>();
+            for (Customer c : customerDAO.getAll()) customerCache.put(c.getId(), c);
+            
+            java.util.Map<Integer, Account> accountCache = new java.util.HashMap<>();
+            for (Account a : accountDAO.getAll()) accountCache.put(a.getId(), a);
+            
+            java.util.Map<Integer, Boolean> paidCache = new java.util.HashMap<>();
+            for (Payment p : paymentDAO.getAll()) {
+                if (!paidCache.containsKey(p.getBookingId())) {
+                    paidCache.put(p.getBookingId(), "PAID".equals(p.getStatus()));
+                }
+            }
+            
             bookingModel.setRowCount(0);
             for (Booking b : bookingDAO.getAll()) {
                 int fi = cbFilter.getSelectedIndex();
                 if (fi == 1 && !"CHECKED_IN".equals(b.getStatus())) continue;
                 if (fi == 2 && !"CHECKED_OUT".equals(b.getStatus())) continue;
-                addBookingRow(b);
+                addBookingRow(b, roomCache, customerCache, accountCache, paidCache);
             }
         });
 
@@ -654,16 +679,37 @@ public class AdminDashboard extends JFrame {
     }
 
     private void loadBookingData() {
+        // Cache tất cả rooms, customers, accounts để tránh gọi DB nhiều lần
+        java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
+        for (Room r : roomDAO.getAll()) roomCache.put(r.getId(), r);
+        
+        java.util.Map<Integer, Customer> customerCache = new java.util.HashMap<>();
+        for (Customer c : customerDAO.getAll()) customerCache.put(c.getId(), c);
+        
+        java.util.Map<Integer, Account> accountCache = new java.util.HashMap<>();
+        for (Account a : accountDAO.getAll()) accountCache.put(a.getId(), a);
+        
+        java.util.Map<Integer, Boolean> paidCache = new java.util.HashMap<>();
+        for (Payment p : paymentDAO.getAll()) {
+            if (!paidCache.containsKey(p.getBookingId())) {
+                paidCache.put(p.getBookingId(), "PAID".equals(p.getStatus()));
+            }
+        }
+        
         bookingModel.setRowCount(0);
-        for (Booking b : bookingDAO.getAll()) addBookingRow(b);
+        for (Booking b : bookingDAO.getAll()) {
+            addBookingRow(b, roomCache, customerCache, accountCache, paidCache);
+        }
     }
 
-    private void addBookingRow(Booking b) {
-        Room r     = roomDAO.getById(b.getRoomId());
-        Customer c = customerDAO.getById(b.getCustomerId());
-        Account  a = accountDAO.getById(b.getStaffId());
-        boolean paid = paymentDAO.getAll().stream()
-            .anyMatch(p -> p.getBookingId() == b.getId() && "PAID".equals(p.getStatus()));
+    private void addBookingRow(Booking b, java.util.Map<Integer, Room> roomCache, 
+                               java.util.Map<Integer, Customer> customerCache,
+                               java.util.Map<Integer, Account> accountCache,
+                               java.util.Map<Integer, Boolean> paidCache) {
+        Room r     = roomCache.get(b.getRoomId());
+        Customer c = customerCache.get(b.getCustomerId());
+        Account  a = accountCache.get(b.getStaffId());
+        boolean paid = paidCache.getOrDefault(b.getId(), false);
 
         bookingModel.addRow(new Object[]{
             b.getId(),
@@ -720,16 +766,23 @@ public class AdminDashboard extends JFrame {
             sb.append(String.format("📋 BOOKING: Tổng %d | Đang thuê %d | Đã trả %d%n%n",
                 bookings.size(), checkedIn, checkedOut));
 
-            // Tần suất sử dụng phòng (top 5)
+            // Tần suất sử dụng phòng (top 5) - tối ưu: cache rooms thay vì gọi DB cho mỗi room
             sb.append("📈 TOP PHÒNG ĐƯỢC THUÊ NHIỀU NHẤT:\n");
             java.util.Map<Integer, Long> freq = new java.util.HashMap<>();
             for (Booking b : bookings)
                 freq.merge(b.getRoomId(), 1L, Long::sum);
+            
+            // Cache tất cả rooms vào map để tránh gọi DB nhiều lần
+            java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
+            for (Room r : roomDAO.getAll()) {
+                roomCache.put(r.getId(), r);
+            }
+            
             freq.entrySet().stream()
                 .sorted((a, b2) -> Long.compare(b2.getValue(), a.getValue()))
                 .limit(5)
                 .forEach(entry -> {
-                    Room r = roomDAO.getById(entry.getKey());
+                    Room r = roomCache.get(entry.getKey());
                     sb.append(String.format("  • Phòng %-6s : %d lần thuê%n",
                         r != null ? r.getRoomNumber() : "#" + entry.getKey(), entry.getValue()));
                 });
@@ -739,11 +792,18 @@ public class AdminDashboard extends JFrame {
             java.util.Map<Integer, Long> svFreq = new java.util.HashMap<>();
             for (ServiceUsage su : suD.getAll())
                 svFreq.merge(su.getServiceId(), (long)su.getQuantity(), Long::sum);
+            
+            // Cache tất cả services vào map để tránh gọi DB nhiều lần
+            java.util.Map<Integer, Service> serviceCache = new java.util.HashMap<>();
+            for (Service sv : serviceDAO.getAll()) {
+                serviceCache.put(sv.getId(), sv);
+            }
+            
             svFreq.entrySet().stream()
                 .sorted((a, b2) -> Long.compare(b2.getValue(), a.getValue()))
                 .limit(5)
                 .forEach(entry -> {
-                    Service sv = serviceDAO.getById(entry.getKey());
+                    Service sv = serviceCache.get(entry.getKey());
                     sb.append(String.format("  • %-20s : %d lần%n",
                         sv != null ? sv.getName() : "#" + entry.getKey(), entry.getValue()));
                 });

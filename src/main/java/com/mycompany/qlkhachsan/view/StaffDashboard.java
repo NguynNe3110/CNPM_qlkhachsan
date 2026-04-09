@@ -521,12 +521,26 @@ public class StaffDashboard extends JFrame {
     }
 
     void loadBookingData() {
+        // Cache tất cả rooms, customers để tránh gọi DB nhiều lần
+        java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
+        for (Room r : roomDAO.getAll()) roomCache.put(r.getId(), r);
+        
+        java.util.Map<Integer, Customer> customerCache = new java.util.HashMap<>();
+        for (Customer c : customerDAO.getAll()) customerCache.put(c.getId(), c);
+        
+        java.util.Map<Integer, Boolean> paidCache = new java.util.HashMap<>();
+        for (Payment p : paymentDAO.getAll()) {
+            if (!paidCache.containsKey(p.getBookingId())) {
+                paidCache.put(p.getBookingId(), "PAID".equals(p.getStatus()));
+            }
+        }
+        
         bookingModel.setRowCount(0);
         for (Booking b : bookingDAO.getAll()) {
             if ("CHECKED_OUT".equals(b.getStatus()) || "CANCELLED".equals(b.getStatus())) continue;
-            Room r = roomDAO.getById(b.getRoomId());
-            Customer c = customerDAO.getById(b.getCustomerId());
-            boolean paid = isPaymentPaid(b.getId());
+            Room r = roomCache.get(b.getRoomId());
+            Customer c = customerCache.get(b.getCustomerId());
+            boolean paid = paidCache.getOrDefault(b.getId(), false);
             bookingModel.addRow(new Object[]{
                 b.getId(),
                 r != null ? r.getRoomNumber() : "?",
