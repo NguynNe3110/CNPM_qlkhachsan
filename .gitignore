@@ -1,21 +1,15 @@
-# Compiled and build artifacts
+```
+# Compiled Java classes
 *.class
-*.o
-*.obj
-*.out
-build/
+
+# Maven/Gradle build directory
 target/
 
-# Dependencies
-lib/
-*.jar
-*.war
-*.ear
-
-# Logs and temp files
-*.log
-*.tmp
+# IDE files
 *.swp
+*.swo
+*.tmp
+*.log
 
 # Environment
 .env
@@ -25,25 +19,14 @@ lib/
 # Editors
 .vscode/
 .idea/
-*.iml
-*.ipr
-*.iws
 
-# OS
-.DS_Store
-Thumbs.db
+# Coverage reports
+coverage/
+htmlcov/
+*.coverage
 
-# Testing
-test-results/
-*.jks
-
-# Maven/Gradle
-.mvn/
+# Dependencies cache
+.mypy_cache/
+.pytest_cache/
 .gradle/
-!gradle.properties
-
-# Package manager
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+```
