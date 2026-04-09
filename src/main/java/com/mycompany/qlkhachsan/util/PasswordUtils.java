@@ -4,6 +4,7 @@ import java.security.MessageDigest;
 
 public class PasswordUtils {
 
+    /** Mã hóa SHA-256 (không dùng nữa nhưng giữ lại để tương thích) */
     public static String hash(String password) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -23,5 +24,10 @@ public class PasswordUtils {
 
     public static boolean verify(String plainText, String hashed) {
         return hash(plainText).equals(hashed);
+    }
+    
+    /** Trả về mật khẩu plain text (không mã hóa) */
+    public static String toPlainText(String password) {
+        return password;
     }
 }
