@@ -732,18 +732,7 @@ public class StaffDashboard extends JFrame {
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────
 
-    /** Tạo form nhập liệu dạng label-field */
-    private JPanel buildForm(String... labelAndFields) {
-        JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-        form.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        for (int i = 0; i < labelAndFields.length - 1; i += 2) {
-            form.add(new JLabel(labelAndFields[i]));
-            // labelAndFields[i+1] is the field name — actual component passed separately via overload
-        }
-        return form;
-    }
-
-    /** Overload: nhận thẳng Component */
+    /** Tạo form nhập liệu dạng label-field (3 cặp) */
     private JPanel buildForm(String l1, JComponent f1, String l2, JComponent f2, String l3, JComponent f3) {
         JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
         form.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
