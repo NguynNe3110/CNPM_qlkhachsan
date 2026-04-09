@@ -2,7 +2,6 @@ package com.mycompany.qlkhachsan.dao;
 
 import com.mycompany.qlkhachsan.config.DBConfig;
 import com.mycompany.qlkhachsan.model.Account;
-import com.mycompany.qlkhachsan.util.PasswordUtils;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,8 +43,7 @@ public class AccountDAO implements BaseDAO<Account> {
     }
 
     /**
-     * Đăng nhập hỗ trợ cả plain text (DB cũ) lẫn SHA-256.
-     * Khi login bằng plain text thành công → tự động hash và lưu lại (migrate 1 lần).
+     * Đăng nhập với mật khẩu plain text (không mã hóa).
      */
     public Account login(String username, String password) {
         try (Connection con = DBConfig.getConnection();
@@ -56,26 +54,8 @@ public class AccountDAO implements BaseDAO<Account> {
                 if (!rs.next()) return null;
                 Account a = mapRow(rs);
                 String stored = a.getPassword();
-                boolean match;
-
-                if (PasswordUtils.isHashed(stored)) {
-                    // Đã hash → verify bình thường
-                    match = PasswordUtils.verify(password, stored);
-                } else {
-                    // Plain text cũ → so sánh trực tiếp
-                    match = stored.equals(password);
-                    if (match) {
-                        // Migrate: lưu hash thay plain text
-                        String h = PasswordUtils.hash(password);
-                        try (PreparedStatement ps2 = con.prepareStatement(
-                                "UPDATE Account SET password=? WHERE id=?")) {
-                            ps2.setString(1, h); ps2.setInt(2, a.getId());
-                            ps2.executeUpdate();
-                        }
-                        a.setPassword(h);
-                        System.out.println("[AccountDAO] Migrated password for: " + username);
-                    }
-                }
+                // So sánh plain text trực tiếp
+                boolean match = stored.equals(password);
                 return match ? a : null;
             }
         } catch (SQLException e) { e.printStackTrace(); }
@@ -101,10 +81,8 @@ public class AccountDAO implements BaseDAO<Account> {
              PreparedStatement ps = con.prepareStatement(
                      "INSERT INTO Account (userName, password, role, isLogin, enable) VALUES (?,?,?,?,?)")) {
             ps.setString(1, a.getUserName());
-            // Luôn lưu hash
-            String pw = PasswordUtils.isHashed(a.getPassword())
-                    ? a.getPassword() : PasswordUtils.hash(a.getPassword());
-            ps.setString(2, pw);
+            // Lưu plain text (không mã hóa)
+            ps.setString(2, a.getPassword());
             ps.setString(3, a.getRole());
             ps.setBoolean(4, false);
             ps.setBoolean(5, a.isEnable());
@@ -119,9 +97,8 @@ public class AccountDAO implements BaseDAO<Account> {
              PreparedStatement ps = con.prepareStatement(
                      "UPDATE Account SET userName=?,password=?,role=?,isLogin=?,enable=? WHERE id=?")) {
             ps.setString(1, a.getUserName());
-            String pw = PasswordUtils.isHashed(a.getPassword())
-                    ? a.getPassword() : PasswordUtils.hash(a.getPassword());
-            ps.setString(2, pw);
+            // Lưu plain text (không mã hóa)
+            ps.setString(2, a.getPassword());
             ps.setString(3, a.getRole());
             ps.setBoolean(4, a.isLogin());
             ps.setBoolean(5, a.isEnable());
@@ -144,14 +121,14 @@ public class AccountDAO implements BaseDAO<Account> {
 
     /**
      * Tạo admin mặc định "admin/admin" nếu bảng trống.
-     * Nếu DB đã có admin plain-text, login() sẽ tự migrate.
+     * Lưu plain text (không mã hóa).
      */
     public void initializeDefaultAdmin() {
         try (Connection con = DBConfig.getConnection();
              PreparedStatement ps = con.prepareStatement("SELECT COUNT(*) FROM Account");
              ResultSet rs = ps.executeQuery()) {
             if (rs.next() && rs.getInt(1) == 0) {
-                Account admin = new Account(0, "admin", PasswordUtils.hash("admin"), "ADMIN", false, true);
+                Account admin = new Account(0, "admin", "admin", "ADMIN", false, true);
                 add(admin);
                 System.out.println("[AccountDAO] Default account created: admin / admin");
             }
