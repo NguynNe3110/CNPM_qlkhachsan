@@ -10,6 +10,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import javax.swing.*;
+import javax.swing.SwingConstants;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 public class StaffDashboard extends JFrame {
@@ -32,6 +34,10 @@ public class StaffDashboard extends JFrame {
     private final Account currentAccount;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    
+    // ─── Loading overlay ─────────────────────────────────────────────────────
+    private JLayeredPane layeredPane;
+    private JPanel loadingPanel;
 
     // ═════════════════════════════════════════════════════════════════════════
     public StaffDashboard(Account account) {
@@ -41,8 +47,37 @@ public class StaffDashboard extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
+        layeredPane = getLayeredPane();
+        initLoadingOverlay();
+
         add(buildHeader(), BorderLayout.NORTH);
         add(buildTabs(), BorderLayout.CENTER);
+    }
+    
+    /** Khởi tạo loading overlay */
+    private void initLoadingOverlay() {
+        loadingPanel = new JPanel(new GridBagLayout());
+        loadingPanel.setOpaque(false);
+        JLabel lblLoading = new JLabel("Đang tải dữ liệu...");
+        lblLoading.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lblLoading.setForeground(new Color(30, 100, 30));
+        loadingPanel.add(lblLoading);
+        loadingPanel.setVisible(false);
+    }
+    
+    /** Hiển thị loading overlay */
+    private void showLoading(boolean show) {
+        if (show) {
+            loadingPanel.setBounds(0, 0, getWidth(), getHeight());
+            loadingPanel.setBackground(new Color(255, 255, 255, 200));
+            layeredPane.add(loadingPanel, JLayeredPane.POPUP_LAYER);
+            loadingPanel.setVisible(true);
+        } else {
+            if (loadingPanel != null) {
+                loadingPanel.setVisible(false);
+                layeredPane.remove(loadingPanel);
+            }
+        }
     }
 
     // ─── HEADER ──────────────────────────────────────────────────────────────
@@ -98,11 +133,12 @@ public class StaffDashboard extends JFrame {
         JTable table = new JTable(customerModel);
         UIUtils.configureTable(table);
         UIUtils.hideColumn(table, 0);
+        loadCustomerData();
 
         JTextField txtSearch = new JTextField(22);
         JButton btnSearch = UIUtils.makeButton("🔍 Tìm kiếm", new Color(100, 149, 237));
-        JButton btnReset  = UIUtils.makeButton("↺ Tất cả", new Color(200, 200, 200));
-        JButton btnAdd    = UIUtils.makeButton("+ Thêm khách", new Color(144, 238, 144));
+        JButton btnReset  = UIUtils.makeButton("↺ Làm mới", new Color(200, 200, 200));
+        JButton btnAdd    = UIUtils.makeButton("➕ Thêm khách", new Color(144, 238, 144));
         JButton btnEdit   = UIUtils.makeButton("✏ Sửa thông tin", new Color(255, 215, 0));
 
         btnSearch.addActionListener(e -> {
@@ -116,6 +152,25 @@ public class StaffDashboard extends JFrame {
         btnAdd.addActionListener(e -> doAddCustomer(table));
         btnEdit.addActionListener(e -> doEditCustomer(table));
 
+        // Right-click context menu
+        JPopupMenu popup = new JPopupMenu();
+        JMenuItem miEdit = new JMenuItem("✏ Sửa thông tin");
+        JMenuItem miAdd  = new JMenuItem("➕ Thêm khách hàng");
+        popup.add(miAdd); popup.addSeparator(); popup.add(miEdit);
+
+        table.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e)  { showPopup(e); }
+            public void mouseReleased(MouseEvent e) { showPopup(e); }
+            private void showPopup(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    int row = table.rowAtPoint(e.getPoint());
+                    if (row >= 0) { table.setRowSelectionInterval(row, row); popup.show(table, e.getX(), e.getY()); }
+                }
+            }
+        });
+        miAdd.addActionListener(e -> btnAdd.doClick());
+        miEdit.addActionListener(e -> btnEdit.doClick());
+
         // Layout
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
         top.add(new JLabel("Tìm (tên/SĐT/CCCD):")); top.add(txtSearch);
@@ -126,16 +181,29 @@ public class StaffDashboard extends JFrame {
 
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(15, 15, 10, 15));
-        p.add(top, BorderLayout.NORTH);
+        p.add(new JLabel("  QUẢN LÝ KHÁCH HÀNG  (chuột phải để thao tác)"), BorderLayout.NORTH);
         p.add(new JScrollPane(table), BorderLayout.CENTER);
-        p.add(bot, BorderLayout.SOUTH);
+        JPanel southPanel = new JPanel(new BorderLayout());
+        southPanel.add(top, BorderLayout.WEST);
+        southPanel.add(bot, BorderLayout.EAST);
+        p.add(southPanel, BorderLayout.SOUTH);
         return p;
     }
 
     private void loadCustomerData() {
-        customerModel.setRowCount(0);
-        for (Customer c : customerDAO.getAll())
-            customerModel.addRow(new Object[]{c.getId(), c.getName(), c.getPhone(), c.getIdentityNumber()});
+        SwingWorker<List<Customer>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<Customer> doInBackground() { return customerDAO.getAll(); }
+            @Override
+            protected void done() {
+                try {
+                    customerModel.setRowCount(0);
+                    for (Customer c : get()) 
+                        customerModel.addRow(new Object[]{c.getId(), c.getName(), c.getPhone(), c.getIdentityNumber()});
+                } catch (Exception e) { UIUtils.showError(StaffDashboard.this, \"Lỗi tải dữ liệu: \" + e.getMessage()); }
+            }
+        };
+        worker.execute();
     }
 
     private void doAddCustomer(JTable table) {
@@ -234,16 +302,7 @@ public class StaffDashboard extends JFrame {
         JButton btnViewTenant = UIUtils.makeButton("👁 Xem thông tin", new Color(100, 149, 237));
         JButton btnRefresh   = UIUtils.makeButton("↺ Làm mới", new Color(200, 200, 200));
 
-        btnCheckIn.addActionListener(e -> {
-            if (!UIUtils.requireSelection(this, table)) return;
-            int id = (int) roomModel.getValueAt(table.getSelectedRow(), 0);
-            Room room = roomDAO.getById(id);
-            if (!"EMPTY".equals(room.getStatus())) {
-                UIUtils.showError(this, "Chỉ có thể check-in phòng đang TRỐNG.");
-                return;
-            }
-            doCheckIn(room);
-        });
+        btnCheckIn.addActionListener(e -> doCheckIn(table));
 
         btnViewTenant.addActionListener(e -> {
             if (!UIUtils.requireSelection(this, table)) return;
@@ -288,7 +347,7 @@ public class StaffDashboard extends JFrame {
         legend.add(makeColorLabel("Bảo trì / Khác", new Color(255, 240, 200)));
 
         JPanel north = new JPanel(new BorderLayout());
-        north.add(new JLabel("  DANH SÁCH PHÒNG  (chuột phải để thao tác)", SwingConstants.LEFT), BorderLayout.WEST);
+        north.add(new JLabel("  QUẢN LÝ PHÒNG & CHECK-IN  (chuột phải để thao tác)", SwingConstants.LEFT), BorderLayout.WEST);
         north.add(legend, BorderLayout.EAST);
 
         JPanel p = new JPanel(new BorderLayout(8, 8));
@@ -297,6 +356,72 @@ public class StaffDashboard extends JFrame {
         p.add(new JScrollPane(table), BorderLayout.CENTER);
         p.add(bot, BorderLayout.SOUTH);
         return p;
+    }
+
+    private void doCheckIn(JTable table) {
+        if (!UIUtils.requireSelection(this, table)) return;
+        int id = (int) roomModel.getValueAt(table.getSelectedRow(), 0);
+        Room room = roomDAO.getById(id);
+        if (!"EMPTY".equals(room.getStatus())) {
+            UIUtils.showError(this, "Chỉ có thể check-in phòng đang TRỐNG!");
+            return;
+        }
+
+        // Chọn khách
+        String[] opts = {"Khách hiện có (nhập ID)", "Tạo khách mới"};
+        int choice = JOptionPane.showOptionDialog(this,
+            "Phòng " + room.getRoomNumber() + " - Chọn cách nhập khách hàng:",
+            "Check-in", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+            null, opts, opts[0]);
+        if (choice < 0) return;
+
+        Customer customer = null;
+        if (choice == 0) {
+            String s = JOptionPane.showInputDialog(this, "Nhập ID khách hàng:");
+            if (s == null || s.trim().isEmpty()) return;
+            try { customer = customerDAO.getById(Integer.parseInt(s.trim())); }
+            catch (NumberFormatException ex) { UIUtils.showError(this, "ID không hợp lệ."); return; }
+            if (customer == null) { UIUtils.showError(this, "Không tìm thấy khách."); return; }
+        } else {
+            customer = doCreateCustomerInline();
+            if (customer == null) return;
+        }
+
+        if (!UIUtils.confirm(this, String.format(
+                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s</html>",
+                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName()))) return;
+
+        Booking b = new Booking();
+        b.setCustomerId(customer.getId()); b.setRoomId(room.getId());
+        b.setStaffId(currentAccount.getId()); b.setStatus("CHECKED_IN");
+        b.setTotalAmount(room.getPrice());
+        b.setBookingDate(LocalDate.now()); b.setCheckInDate(LocalDate.now());
+
+        if (bookingDAO.add(b)) {
+            room.setStatus("OCCUPIED"); roomDAO.update(room);
+            loadRoomData(); loadBookingData();
+            UIUtils.showInfo(this, "✅ Check-in thành công! Phòng " + room.getRoomNumber());
+        } else UIUtils.showError(this, "Check-in thất bại.");
+    }
+
+    private Customer doCreateCustomerInline() {
+        JTextField fName = new JTextField(20), fPhone = new JTextField(20), fCCCD = new JTextField(20);
+        JPanel form = buildForm("Họ tên:", fName, "SĐT (10 số):", fPhone, "CCCD (12 số):", fCCCD);
+
+        if (JOptionPane.showConfirmDialog(this, form, "Thêm khách mới",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return null;
+
+        String name = fName.getText().trim(), phone = fPhone.getText().trim(), cccd = fCCCD.getText().trim();
+        if (name.isEmpty())                    { UIUtils.showError(this, "Tên không được để trống."); return null; }
+        if (!UIUtils.isValidPhone(phone))       { UIUtils.showError(this, "SĐT phải đúng 10 chữ số."); return null; }
+        if (!UIUtils.isValidCCCD(cccd))         { UIUtils.showError(this, "CCCD phải đúng 12 chữ số."); return null; }
+        if (customerDAO.isPhoneTaken(phone, 0)) { UIUtils.showError(this, "SĐT đã tồn tại."); return null; }
+        if (customerDAO.isCCCDTaken(cccd, 0))   { UIUtils.showError(this, "CCCD đã tồn tại."); return null; }
+
+        Customer c = new Customer(); c.setName(name); c.setPhone(phone); c.setIdentityNumber(cccd);
+        if (!customerDAO.add(c)) { UIUtils.showError(this, "Thêm khách thất bại."); return null; }
+        List<Customer> list = customerDAO.search(phone);
+        return list.isEmpty() ? null : list.get(0);
     }
 
     private String getRawRoomStatus(int viewRow) {
@@ -308,99 +433,25 @@ public class StaffDashboard extends JFrame {
     }
 
     void loadRoomData() {
-        roomModel.setRowCount(0);
-        for (Room r : roomDAO.getAll()) {
-            if (!r.isEnable()) continue;
-            roomModel.addRow(new Object[]{
-                r.getId(),
-                r.getRoomNumber(),
-                r.getType(),
-                String.format("%,.0f", r.getPrice()),
-                UIUtils.translateStatus(r.getStatus())
-            });
-        }
-    }
-
-    /** Check-in: chọn phòng → nhập/tạo khách → xác nhận */
-    private void doCheckIn(Room room) {
-        // Bước 1: Hỏi muốn dùng khách hiện có hay thêm mới
-        String[] options = {"Khách hiện có (nhập ID)", "Tạo khách mới"};
-        int choice = JOptionPane.showOptionDialog(this,
-            "Phòng " + room.getRoomNumber() + " - Chọn cách nhập thông tin khách:",
-            "Check-in - Phòng " + room.getRoomNumber(),
-            JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-            null, options, options[0]);
-        if (choice < 0) return;
-
-        Customer customer = null;
-
-        if (choice == 0) {
-            // Khách hiện có
-            String idStr = JOptionPane.showInputDialog(this, "Nhập ID khách hàng:");
-            if (idStr == null || idStr.trim().isEmpty()) return;
-            try {
-                customer = customerDAO.getById(Integer.parseInt(idStr.trim()));
-            } catch (NumberFormatException ex) {
-                UIUtils.showError(this, "ID không hợp lệ."); return;
+        SwingWorker<List<Room>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<Room> doInBackground() { return roomDAO.getAll(); }
+            @Override
+            protected void done() {
+                try {
+                    roomModel.setRowCount(0);
+                    for (Room r : get()) {
+                        if (!r.isEnable()) continue;
+                        roomModel.addRow(new Object[]{
+                            r.getId(), r.getRoomNumber(), r.getType(),
+                            String.format("%,.0f", r.getPrice()),
+                            UIUtils.translateStatus(r.getStatus())
+                        });
+                    }
+                } catch (Exception e) { UIUtils.showError(StaffDashboard.this, "Lỗi tải phòng: " + e.getMessage()); }
             }
-            if (customer == null) { UIUtils.showError(this, "Không tìm thấy khách có ID = " + idStr); return; }
-        } else {
-            // Tạo khách mới ngay tại đây
-            JTextField fName  = new JTextField(20);
-            JTextField fPhone = new JTextField(20);
-            JTextField fCCCD  = new JTextField(20);
-            JPanel form = buildForm("Họ và tên:", fName, "SĐT (10 số):", fPhone, "CCCD (12 số):", fCCCD);
-            if (JOptionPane.showConfirmDialog(this, form, "Thêm khách mới khi check-in",
-                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
-
-            String name = fName.getText().trim(), phone = fPhone.getText().trim(), cccd = fCCCD.getText().trim();
-            if (name.isEmpty())                   { UIUtils.showError(this, "Tên không được để trống."); return; }
-            if (!UIUtils.isValidPhone(phone))      { UIUtils.showError(this, "SĐT phải đúng 10 chữ số."); return; }
-            if (!UIUtils.isValidCCCD(cccd))        { UIUtils.showError(this, "CCCD phải đúng 12 chữ số."); return; }
-            if (customerDAO.isPhoneTaken(phone, 0)){ UIUtils.showError(this, "SĐT đã tồn tại."); return; }
-            if (customerDAO.isCCCDTaken(cccd, 0))  { UIUtils.showError(this, "CCCD đã tồn tại."); return; }
-
-            Customer newC = new Customer();
-            newC.setName(name); newC.setPhone(phone); newC.setIdentityNumber(cccd);
-            if (!customerDAO.add(newC)) { UIUtils.showError(this, "Lưu khách mới thất bại."); return; }
-            // Lấy lại ID vừa thêm
-            List<Customer> all = customerDAO.search(phone);
-            if (all.isEmpty()) { UIUtils.showError(this, "Lỗi lấy ID khách mới."); return; }
-            customer = all.get(0);
-            loadCustomerData();
-        }
-
-        // Bước 2: Xác nhận check-in
-        String msg = String.format(
-            "<html><b>Xác nhận Check-in?</b><br><br>" +
-            "Phòng: <b>%s</b> (%s)<br>Giá: <b>%,.0f VNĐ/đêm</b><br><br>" +
-            "Khách: <b>%s</b><br>SĐT: %s | CCCD: %s<br><br>" +
-            "Ngày check-in: <b>%s</b></html>",
-            room.getRoomNumber(), room.getType(), room.getPrice(),
-            customer.getName(), customer.getPhone(), customer.getIdentityNumber(),
-            LocalDate.now().format(DATE_FMT)
-        );
-        if (!UIUtils.confirm(this, msg)) return;
-
-        // Bước 3: Tạo Booking
-        Booking b = new Booking();
-        b.setCustomerId(customer.getId());
-        b.setRoomId(room.getId());
-        b.setStaffId(currentAccount.getId());
-        b.setStatus("CHECKED_IN");
-        b.setTotalAmount(room.getPrice());
-        b.setBookingDate(LocalDate.now());
-        b.setCheckInDate(LocalDate.now());
-
-        if (bookingDAO.add(b)) {
-            room.setStatus("OCCUPIED");
-            roomDAO.update(room);
-            loadRoomData();
-            loadBookingData();
-            UIUtils.showInfo(this, "✅ Check-in thành công!\nPhòng " + room.getRoomNumber() + " - Khách: " + customer.getName());
-        } else {
-            UIUtils.showError(this, "Check-in thất bại. Vui lòng thử lại.");
-        }
+        };
+        worker.execute();
     }
 
     /** Hiển thị thông tin người đang thuê phòng */
@@ -521,23 +572,37 @@ public class StaffDashboard extends JFrame {
     }
 
     void loadBookingData() {
-        bookingModel.setRowCount(0);
-        for (Booking b : bookingDAO.getAll()) {
-            if ("CHECKED_OUT".equals(b.getStatus()) || "CANCELLED".equals(b.getStatus())) continue;
-            Room r = roomDAO.getById(b.getRoomId());
-            Customer c = customerDAO.getById(b.getCustomerId());
-            boolean paid = isPaymentPaid(b.getId());
-            bookingModel.addRow(new Object[]{
-                b.getId(),
-                r != null ? r.getRoomNumber() : "?",
-                c != null ? c.getName() : "?",
-                b.getBookingDate() != null ? b.getBookingDate().format(DATE_FMT) : "N/A",
-                b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "N/A",
-                String.format("%,.0f", b.getTotalAmount()),
-                paid ? "Đã thanh toán" : "Chưa thanh toán",
-                UIUtils.translateStatus(b.getStatus())
-            });
-        }
+        SwingWorker<List<Object[]>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<Object[]> doInBackground() {
+                List<Object[]> rows = new java.util.ArrayList<>();
+                for (Booking b : bookingDAO.getAll()) {
+                    if ("CHECKED_OUT".equals(b.getStatus()) || "CANCELLED".equals(b.getStatus())) continue;
+                    Room r = roomDAO.getById(b.getRoomId());
+                    Customer c = customerDAO.getById(b.getCustomerId());
+                    boolean paid = isPaymentPaid(b.getId());
+                    rows.add(new Object[]{
+                        b.getId(),
+                        r != null ? r.getRoomNumber() : "?",
+                        c != null ? c.getName() : "?",
+                        b.getBookingDate() != null ? b.getBookingDate().format(DATE_FMT) : "N/A",
+                        b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "N/A",
+                        String.format("%,.0f", b.getTotalAmount()),
+                        paid ? "Đã thanh toán" : "Chưa thanh toán",
+                        UIUtils.translateStatus(b.getStatus())
+                    });
+                }
+                return rows;
+            }
+            @Override
+            protected void done() {
+                try {
+                    bookingModel.setRowCount(0);
+                    for (Object[] row : get()) bookingModel.addRow(row);
+                } catch (Exception e) { UIUtils.showError(StaffDashboard.this, "Lỗi tải booking: " + e.getMessage()); }
+            }
+        };
+        worker.execute();
     }
 
     private boolean isPaymentPaid(int bookingId) {
