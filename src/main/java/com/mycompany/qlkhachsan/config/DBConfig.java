@@ -27,19 +27,22 @@ public class DBConfig {
         }
     }
 
-    public static String getUrl() {
-        return properties.getProperty("db.url");
-    }
+public static String getUrl() {
+    String env = System.getenv("DB_URL");
+    return env != null ? env : properties.getProperty("db.url");
+}
 
-    public static String getUser() {
-        return properties.getProperty("db.user");
-    }
+public static String getUser() {
+    String env = System.getenv("DB_USER");
+    return env != null ? env : properties.getProperty("db.user");
+}
 
-    public static String getPassword() {
-        return properties.getProperty("db.password");
-    }
+public static String getPassword() {
+    String env = System.getenv("DB_PASSWORD");
+    return env != null ? env : properties.getProperty("db.password");
+}
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(getUrl(), getUser(), getPassword());
     }
-}
+}~
