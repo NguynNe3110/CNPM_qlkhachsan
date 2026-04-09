@@ -45,4 +45,4 @@ public static String getPassword() {
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(getUrl(), getUser(), getPassword());
     }
-}~
+}

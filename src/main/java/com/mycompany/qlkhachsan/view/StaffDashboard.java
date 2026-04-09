@@ -200,7 +200,7 @@ public class StaffDashboard extends JFrame {
                     customerModel.setRowCount(0);
                     for (Customer c : get()) 
                         customerModel.addRow(new Object[]{c.getId(), c.getName(), c.getPhone(), c.getIdentityNumber()});
-                } catch (Exception e) { UIUtils.showError(StaffDashboard.this, \"Lỗi tải dữ liệu: \" + e.getMessage()); }
+                } catch (Exception e) { UIUtils.showError(StaffDashboard.this, "Lỗi tải dữ liệu: " + e.getMessage()); }
             }
         };
         worker.execute();

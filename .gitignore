@@ -1,32 +1,45 @@
 ```
-# Java/Maven build artifacts
-target/
+# Compiled Java classes
 *.class
-*.jar
-*.war
-*.ear
 
-# Maven-specific
-.mvn/
-mvn/
-!pom.xml
+# Maven build directory
+target/
 
 # IDE files
 .idea/
 .vscode/
-*.iml
-*.ipr
-*.iws
 
 # Logs
 *.log
 
-# Environment
+# Temporary files
+*.tmp
+*.swp
+
+# Environment files
 .env
 .env.local
 *.env.*
 
-# OS generated files
-.DS_Store
-Thumbs.db
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Package manager caches
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python related (if any Python files exist in the project)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+.venv/
 ```
