@@ -1,12 +1,17 @@
 package com.mycompany.qlkhachsan.model;
 
+import java.time.LocalDate;
+
 public class Booking {
     private int id;
     private int customerId;
     private int roomId;
-    private int staffId; // Account id
+    private int staffId;
     private String status; // BOOKED, CHECKED_IN, CHECKED_OUT, CANCELLED
     private double totalAmount;
+    private LocalDate bookingDate;
+    private LocalDate checkInDate;
+    private LocalDate checkOutDate;
 
     public Booking() {}
 
@@ -27,4 +32,13 @@ public class Booking {
 
     public double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
+
+    public LocalDate getBookingDate() { return bookingDate; }
+    public void setBookingDate(LocalDate bookingDate) { this.bookingDate = bookingDate; }
+
+    public LocalDate getCheckInDate() { return checkInDate; }
+    public void setCheckInDate(LocalDate checkInDate) { this.checkInDate = checkInDate; }
+
+    public LocalDate getCheckOutDate() { return checkOutDate; }
+    public void setCheckOutDate(LocalDate checkOutDate) { this.checkOutDate = checkOutDate; }
 }

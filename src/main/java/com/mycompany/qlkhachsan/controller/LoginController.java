@@ -15,31 +15,29 @@ public class LoginController {
     public LoginController(LoginForm view, AccountDAO model) {
         this.view = view;
         this.model = model;
-
-        this.view.addLoginListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleLogin();
-            }
-        });
+        this.view.addLoginListener(e -> handleLogin());
     }
 
     private void handleLogin() {
-        String username = view.getUsername();
+        String username = view.getUsername().trim();
         String password = view.getPassword();
 
-        Account account = model.login(username, password);
+        if (username.isEmpty() || password.isEmpty()) {
+            view.showMessage("Vui lòng nhập tên đăng nhập và mật khẩu.");
+            return;
+        }
 
+        Account account = model.login(username, password);
         if (account != null) {
             view.setVisible(false);
             if ("ADMIN".equals(account.getRole())) {
-                new AdminDashboard().setVisible(true);
+                new AdminDashboard(account).setVisible(true);
             } else {
-                new StaffDashboard().setVisible(true);
+                new StaffDashboard(account).setVisible(true);
             }
             view.dispose();
         } else {
-            view.showMessage("Sai tên đăng nhập hoặc mật khẩu, hoặc tài khoản đã bị vô hiệu hóa.");
+            view.showMessage("Sai tên đăng nhập / mật khẩu, hoặc tài khoản đã bị vô hiệu hóa.");
         }
     }
 }
