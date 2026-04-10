@@ -374,6 +374,11 @@ public class AdminDashboard extends JFrame {
         
         try {
             double price = Double.parseDouble(fPrice.getText().trim());
+            // Yêu cầu giá tối thiểu 1.000 VNĐ
+            if (price < 1000) {
+                UIUtils.showError(this, "Giá phòng phải lớn hơn hoặc bằng 1.000 VNĐ!");
+                return;
+            }
             Room r = new Room();
             r.setRoomNumber(num); r.setType(type); r.setPrice(price);
             r.setStatus("EMPTY"); r.setEnable(true);
@@ -405,9 +410,22 @@ public class AdminDashboard extends JFrame {
 
         String num = fNum.getText().trim(), type = fType.getText().trim();
         if (num.isEmpty() || type.isEmpty()) { UIUtils.showError(this, "Không được để trống."); return; }
+        
+        // Kiểm tra trùng số phòng (loại trừ id hiện tại)
+        if (roomDAO.isRoomNumberTaken(num, id)) {
+            UIUtils.showError(this, "Số phòng \"" + num + "\" đã tồn tại!");
+            return;
+        }
+        
         try {
+            double price = Double.parseDouble(fPrice.getText().trim());
+            // Yêu cầu giá tối thiểu 1.000 VNĐ
+            if (price < 1000) {
+                UIUtils.showError(this, "Giá phòng phải lớn hơn hoặc bằng 1.000 VNĐ!");
+                return;
+            }
             r.setRoomNumber(num); r.setType(type);
-            r.setPrice(Double.parseDouble(fPrice.getText().trim()));
+            r.setPrice(price);
             roomDAO.update(r); loadRoomData();
             UIUtils.showInfo(this, "Cập nhật phòng thành công!");
         } catch (NumberFormatException ex) { UIUtils.showError(this, "Giá không hợp lệ."); }
