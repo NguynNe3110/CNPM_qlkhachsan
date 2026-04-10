@@ -12,6 +12,8 @@ import java.util.List;
 import javax.swing.*;
 import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableModel;
+import com.github.lgooddatepicker.components.DateTimePicker;
+import com.github.lgooddatepicker.zinternaltools.Pair;
 
 public class StaffDashboard extends JFrame {
 
@@ -346,23 +348,47 @@ public class StaffDashboard extends JFrame {
             if (customer == null) return;
         }
 
-        // Nhập ngày checkout dự kiến
-        JSpinner spinner = new JSpinner(new SpinnerDateModel());
-        JSpinner.DateEditor editor = new JSpinner.DateEditor(spinner, "dd/MM/yyyy");
-        spinner.setEditor(editor);
-        spinner.setValue(java.util.Date.from(java.time.LocalDate.now().plusDays(1).atStartOfDay().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+        // Nhập thông tin check-in với DateTimePicker
+        JPanel infoPanel = new JPanel(new GridLayout(0, 2, 8, 8));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JPanel datePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        datePanel.add(new JLabel("Ngày checkout dự kiến: "));
-        datePanel.add(spinner);
+        JLabel lblRoom = new JLabel("Phòng: " + room.getRoomNumber() + " (" + room.getType() + ")");
+        JLabel lblPrice = new JLabel("Giá: " + String.format("%,.0f VNĐ", room.getPrice()));
+        JLabel lblCustomer = new JLabel("Khách hàng: " + customer.getName());
         
-        int result = JOptionPane.showConfirmDialog(this, datePanel, 
+        DateTimePicker dateTimePicker = new DateTimePicker();
+        dateTimePicker.getDatePicker().setDateToToday();
+        dateTimePicker.getTimePicker().setTime(java.time.LocalTime.of(14, 0)); // Default 2:00 PM
+        
+        infoPanel.add(new JLabel("Phòng:"));
+        infoPanel.add(lblRoom);
+        infoPanel.add(new JLabel("Giá phòng:"));
+        infoPanel.add(lblPrice);
+        infoPanel.add(new JLabel("Khách hàng:"));
+        infoPanel.add(lblCustomer);
+        infoPanel.add(new JLabel("Ngày giờ checkout dự kiến:"));
+        infoPanel.add(dateTimePicker);
+        
+        int result = JOptionPane.showConfirmDialog(this, infoPanel, 
             "Nhập thông tin check-in cho phòng " + room.getRoomNumber(), 
             JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (result != JOptionPane.OK_OPTION) return;
 
-        java.util.Date selectedDate = (java.util.Date) spinner.getValue();
-        LocalDate expectedCheckOut = java.time.LocalDate.ofInstant(selectedDate.toInstant(), java.time.ZoneId.systemDefault());
+        java.time.LocalDate selectedDate = dateTimePicker.getDatePicker().getDate();
+        java.time.LocalTime selectedTime = dateTimePicker.getTimePicker().getTime();
+        
+        java.time.LocalDateTime expectedCheckOutDateTime = null;
+        if (selectedDate != null && selectedTime != null) {
+            expectedCheckOutDateTime = java.time.LocalDateTime.of(selectedDate, selectedTime);
+        }
+        
+        if (expectedCheckOutDateTime == null) {
+            UIUtils.showError(this, "Vui lòng chọn ngày giờ checkout!");
+            return;
+        }
+        
+        LocalDate expectedCheckOut = expectedCheckOutDateTime.toLocalDate();
+        java.time.LocalTime expectedCheckOutTime = expectedCheckOutDateTime.toLocalTime();
         
         // Kiểm tra ngày checkout dự kiến phải >= ngày checkin
         if (expectedCheckOut.isBefore(LocalDate.now())) {

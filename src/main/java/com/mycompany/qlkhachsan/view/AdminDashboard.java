@@ -105,13 +105,15 @@ public class AdminDashboard extends JFrame {
         JButton btnAdd    = UIUtils.makeButton("➕ Thêm tài khoản", new Color(144, 238, 144));
         JButton btnEdit   = UIUtils.makeButton("✏ Sửa",            new Color(255, 215, 0));
         JButton btnDisable = UIUtils.makeButton("🚫 Vô hiệu hóa",  new Color(255, 160, 122));
+        JButton btnEnable  = UIUtils.makeButton("🔓 Mở khóa",      new Color(100, 200, 100));
 
         btnAdd.addActionListener(e -> doAddAccount());
         btnEdit.addActionListener(e -> doEditAccount(table));
         btnDisable.addActionListener(e -> doDisableAccount(table));
+        btnEnable.addActionListener(e -> doEnableAccount(table));
 
         JPanel bot = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        bot.add(btnAdd); bot.add(btnEdit); bot.add(btnDisable);
+        bot.add(btnAdd); bot.add(btnEdit); bot.add(btnDisable); bot.add(btnEnable);
 
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(15, 15, 10, 15));
@@ -208,6 +210,26 @@ public class AdminDashboard extends JFrame {
         if (!UIUtils.confirm(this, "Vô hiệu hóa tài khoản này?")) return;
         accountDAO.delete(id);
         loadAccountData();
+    }
+
+    private void doEnableAccount(JTable table) {
+        if (!UIUtils.requireSelection(this, table)) return;
+        int id = (int) accountModel.getValueAt(table.getSelectedRow(), 0);
+        Account a = accountDAO.getById(id);
+        if (a == null) {
+            UIUtils.showError(this, "Không tìm thấy tài khoản!"); return;
+        }
+        if (a.isEnable()) {
+            UIUtils.showInfo(this, "Tài khoản này đã được kích hoạt!"); return;
+        }
+        if (!UIUtils.confirm(this, "Mở khóa tài khoản này?")) return;
+        a.setEnable(true);
+        if (accountDAO.update(a)) {
+            loadAccountData();
+            UIUtils.showInfo(this, "Mở khóa tài khoản thành công!");
+        } else {
+            UIUtils.showError(this, "Mở khóa tài khoản thất bại.");
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
