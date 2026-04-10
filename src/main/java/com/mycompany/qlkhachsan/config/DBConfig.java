@@ -1,48 +1,50 @@
 package com.mycompany.qlkhachsan.config;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
 public class DBConfig {
-
-    private static Properties properties = new Properties();
+    private static HikariDataSource dataSource;
 
     static {
         try {
-            InputStream input = DBConfig.class
-                    .getClassLoader()
-                    .getResourceAsStream("config.properties");
-
-            if (input == null) {
-                throw new RuntimeException("Không tìm thấy file config.properties");
+            Properties props = new Properties();
+            try (InputStream input = DBConfig.class.getClassLoader().getResourceAsStream("config.properties")) {
+                if (input == null) {
+                    System.err.println("Sorry, unable to find config.properties");
+                } else {
+                    props.load(input);
+                    
+                    HikariConfig config = new HikariConfig();
+                    config.setJdbcUrl(props.getProperty("db.url"));
+                    config.setUsername(props.getProperty("db.user"));
+                    config.setPassword(props.getProperty("db.password"));
+                    
+                    // Optimization settings for speed and stability
+                    config.addDataSourceProperty("cachePrepStmts", "true");
+                    config.addDataSourceProperty("prepStmtCacheSize", "250");
+                    config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+                    config.setMaximumPoolSize(10); // Standard for desktop apps
+                    config.setMinimumIdle(2);
+                    config.setIdleTimeout(300000);
+                    config.setConnectionTimeout(20000);
+                    
+                    dataSource = new HikariDataSource(config);
+                }
             }
-
-            properties.load(input);
-
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-public static String getUrl() {
-    String env = System.getenv("DB_URL");
-    return env != null ? env : properties.getProperty("db.url");
-}
-
-public static String getUser() {
-    String env = System.getenv("DB_USER");
-    return env != null ? env : properties.getProperty("db.user");
-}
-
-public static String getPassword() {
-    String env = System.getenv("DB_PASSWORD");
-    return env != null ? env : properties.getProperty("db.password");
-}
-
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(getUrl(), getUser(), getPassword());
+        if (dataSource == null) {
+            throw new SQLException("DataSource is not initialized properly.");
+        }
+        return dataSource.getConnection();
     }
 }
