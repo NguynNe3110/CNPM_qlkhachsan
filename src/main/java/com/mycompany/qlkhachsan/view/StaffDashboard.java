@@ -237,16 +237,19 @@ public class StaffDashboard extends JFrame {
         UIUtils.configureTable(table);
         UIUtils.hideColumn(table, 0);
 
-        // Tô màu theo trạng thái phòng
+        // Tô màu theo trạng thái phòng - OPTIMIZED: Cache 1 lần thay vì gọi DB cho mỗi cell
         table.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(JTable t, Object value,
                     boolean isSelected, boolean hasFocus, int row, int col) {
                 Component comp = super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, col);
-                if (!isSelected) {
-                    String rawStatus = getRawRoomStatus(row);
-                    if ("EMPTY".equals(rawStatus))        comp.setBackground(new Color(220, 255, 220));
-                    else if ("OCCUPIED".equals(rawStatus)) comp.setBackground(new Color(255, 230, 200));
-                    else                                   comp.setBackground(new Color(255, 240, 200));
+                if (!isSelected && row < roomModel.getRowCount()) {
+                    int rid = (int) roomModel.getValueAt(row, 0);
+                    String status = roomStatusCache.get(rid);
+                    if (status != null) {
+                        if ("EMPTY".equals(status))        comp.setBackground(new Color(220, 255, 220));
+                        else if ("OCCUPIED".equals(status)) comp.setBackground(new Color(255, 230, 200));
+                        else                                comp.setBackground(new Color(255, 240, 200));
+                    }
                 }
                 return comp;
             }
@@ -389,9 +392,14 @@ public class StaffDashboard extends JFrame {
     }
 
     void loadRoomData() {
+        // Clear cache first
+        roomStatusCache.clear();
+        
         roomModel.setRowCount(0);
         for (Room r : roomDAO.getAll()) {
             if (!r.isEnable()) continue;
+            // Update cache
+            roomStatusCache.put(r.getId(), r.getStatus());
             roomModel.addRow(new Object[]{
                 r.getId(),
                 r.getRoomNumber(),
@@ -401,6 +409,9 @@ public class StaffDashboard extends JFrame {
             });
         }
     }
+
+    /** Cache for room status - avoids repeated DB calls */
+    private java.util.Map<Integer, String> roomStatusCache = new java.util.HashMap<>();
 
     /** Hiển thị thông tin người đang thuê phòng */
     private void showTenantInfo(Room room) {
