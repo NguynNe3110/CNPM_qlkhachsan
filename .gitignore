@@ -1,12 +1,8 @@
 ```
-# Compiled and binary files
+# Compiled and build artifacts
 *.class
 *.o
 *.obj
-*.exe
-*.dll
-*.so
-*.a
 *.out
 
 # Dependencies
@@ -17,15 +13,14 @@ dependencies/
 
 # Build artifacts
 target/
+*.properties
 build/
-dist/
 out/
 bin/
 obj/
+.gradle/
 
 # IDE files
-.idea/
-.vscode/
 *.swp
 *.swo
 *.tmp
@@ -37,11 +32,6 @@ obj/
 .env
 .env.local
 *.env.*
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
 
 # Gradle (since this appears to be Java)
 .gradle/
@@ -60,4 +50,8 @@ pip-delete-this-directory.txt
 # System files
 .DS_Store
 Thumbs.db
+
+# Editors
+.vscode/
+.idea/
 ```

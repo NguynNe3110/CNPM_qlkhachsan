@@ -43,7 +43,7 @@ public class Booking {
 
     public LocalDate getCheckOutDate() { return checkOutDate; }
     public void setCheckOutDate(LocalDate checkOutDate) { this.checkOutDate = checkOutDate; }
-
+    
     public LocalDate getExpectedCheckOutDate() { return expectedCheckOutDate; }
     public void setExpectedCheckOutDate(LocalDate expectedCheckOutDate) { this.expectedCheckOutDate = expectedCheckOutDate; }
 

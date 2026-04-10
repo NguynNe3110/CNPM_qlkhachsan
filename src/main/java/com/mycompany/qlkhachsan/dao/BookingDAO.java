@@ -71,7 +71,7 @@ public class BookingDAO implements BaseDAO<Booking> {
     @Override
     public boolean add(Booking b) {
         String sql = "INSERT INTO Booking (customerId, roomId, staffId, status, totalAmount, bookingDate, checkInDate, checkOutDate, expectedCheckOutDate, actualCheckOutDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection con = DBConfig.getConnection();
+            try (Connection con = DBConfig.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, b.getCustomerId());
             ps.setInt(2, b.getRoomId());
