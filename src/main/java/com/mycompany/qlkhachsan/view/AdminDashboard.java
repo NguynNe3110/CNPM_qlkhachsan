@@ -365,6 +365,13 @@ public class AdminDashboard extends JFrame {
 
         String num = fNum.getText().trim(), type = fType.getText().trim();
         if (num.isEmpty() || type.isEmpty()) { UIUtils.showError(this, "Số phòng và loại không được để trống."); return; }
+        
+        // Kiểm tra trùng số phòng
+        if (roomDAO.isRoomNumberTaken(num, 0)) {
+            UIUtils.showError(this, "Số phòng \"" + num + "\" đã tồn tại!");
+            return;
+        }
+        
         try {
             double price = Double.parseDouble(fPrice.getText().trim());
             Room r = new Room();
@@ -577,14 +584,20 @@ public class AdminDashboard extends JFrame {
         if (name.isEmpty()) { UIUtils.showError(this, "Tên dịch vụ không được để trống."); return; }
 
         // Kiểm tra trùng tên
-        for (Service sv : serviceDAO.getAll())
-            if (sv.getName().equalsIgnoreCase(name)) {
-                UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!"); return;
-            }
+        if (serviceDAO.isServiceNameTaken(name, 0)) {
+            UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!");
+            return;
+        }
 
         try {
+            double price = Double.parseDouble(fPrice.getText().trim());
+            // Yêu cầu giá tối thiểu 1.000 VNĐ
+            if (price < 1000) {
+                UIUtils.showError(this, "Đơn giá phải lớn hơn hoặc bằng 1.000 VNĐ!");
+                return;
+            }
             Service s = new Service();
-            s.setName(name); s.setPrice(Double.parseDouble(fPrice.getText().trim()));
+            s.setName(name); s.setPrice(price);
             if (serviceDAO.add(s)) { loadServiceData(); UIUtils.showInfo(this, "Thêm dịch vụ thành công!"); }
         } catch (NumberFormatException ex) { UIUtils.showError(this, "Đơn giá không hợp lệ."); }
     }
@@ -607,12 +620,21 @@ public class AdminDashboard extends JFrame {
 
         String name = fName.getText().trim();
         if (name.isEmpty()) { UIUtils.showError(this, "Tên không được để trống."); return; }
-        for (Service sv : serviceDAO.getAll())
-            if (sv.getName().equalsIgnoreCase(name) && sv.getId() != id) {
-                UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!"); return;
-            }
+        
+        // Kiểm tra trùng tên (loại trừ id hiện tại)
+        if (serviceDAO.isServiceNameTaken(name, id)) {
+            UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!");
+            return;
+        }
+        
         try {
-            s.setName(name); s.setPrice(Double.parseDouble(fPrice.getText().trim()));
+            double price = Double.parseDouble(fPrice.getText().trim());
+            // Yêu cầu giá tối thiểu 1.000 VNĐ
+            if (price < 1000) {
+                UIUtils.showError(this, "Đơn giá phải lớn hơn hoặc bằng 1.000 VNĐ!");
+                return;
+            }
+            s.setName(name); s.setPrice(price);
             if (serviceDAO.update(s)) { loadServiceData(); UIUtils.showInfo(this, "Cập nhật thành công!"); }
         } catch (NumberFormatException ex) { UIUtils.showError(this, "Đơn giá không hợp lệ."); }
     }
