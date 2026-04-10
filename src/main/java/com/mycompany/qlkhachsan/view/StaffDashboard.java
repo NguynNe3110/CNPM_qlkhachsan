@@ -346,16 +346,40 @@ public class StaffDashboard extends JFrame {
             if (customer == null) return;
         }
 
+        // Nhập ngày checkout dự kiến
+        JSpinner spinner = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(spinner, "dd/MM/yyyy");
+        spinner.setEditor(editor);
+        spinner.setValue(java.util.Date.from(java.time.LocalDate.now().plusDays(1).atStartOfDay().atZone(java.time.ZoneId.systemDefault()).toInstant()));
+        
+        JPanel datePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        datePanel.add(new JLabel("Ngày checkout dự kiến: "));
+        datePanel.add(spinner);
+        
+        int result = JOptionPane.showConfirmDialog(this, datePanel, 
+            "Nhập thông tin check-in cho phòng " + room.getRoomNumber(), 
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) return;
+
+        java.util.Date selectedDate = (java.util.Date) spinner.getValue();
+        LocalDate expectedCheckOut = java.time.LocalDate.ofInstant(selectedDate.toInstant(), java.time.ZoneId.systemDefault());
+        
+        // Kiểm tra ngày checkout dự kiến phải >= ngày checkin
+        if (expectedCheckOut.isBefore(LocalDate.now())) {
+            UIUtils.showError(this, "Ngày checkout dự kiến phải lớn hơn hoặc bằng hôm nay!");
+            return;
+        }
+
         if (!UIUtils.confirm(this, String.format(
-                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s</html>",
-                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName()))) return;
+                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,d VNĐ<br><b>Khách:</b> %s<br><b>Checkout dự kiến:</b> %s</html>",
+                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName(), expectedCheckOut.format(DATE_FMT)))) return;
 
         Booking b = new Booking();
         b.setCustomerId(customer.getId()); b.setRoomId(room.getId());
         b.setStaffId(currentAccount.getId()); b.setStatus("CHECKED_IN");
         b.setTotalAmount(room.getPrice());
         b.setBookingDate(LocalDate.now()); b.setCheckInDate(LocalDate.now());
-
+        b.setExpectedCheckOutDate(expectedCheckOut);
         if (bookingDAO.add(b)) {
             room.setStatus("OCCUPIED"); roomDAO.update(room);
             loadRoomData(); loadBookingData();
@@ -463,7 +487,7 @@ public class StaffDashboard extends JFrame {
     // TAB 3: BOOKING & DỊCH VỤ & CHECK-OUT
     // ═════════════════════════════════════════════════════════════════════════
     private JPanel createCheckOutPanel() {
-        String[] cols = {"BookingID", "Phòng", "Khách hàng", "Ngày đặt", "Ngày check-in",
+        String[] cols = {"BookingID", "Phòng", "Khách hàng", "Ngày đặt", "Ngày check-in", "Checkout dự kiến",
                          "Tổng tiền (VNĐ)", "TT Thanh toán", "TT Booking"};
         bookingModel = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
@@ -557,6 +581,7 @@ public class StaffDashboard extends JFrame {
                 c != null ? c.getName() : "?",
                 b.getBookingDate() != null ? b.getBookingDate().format(DATE_FMT) : "N/A",
                 b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "N/A",
+                b.getExpectedCheckOutDate() != null ? b.getExpectedCheckOutDate().format(DATE_FMT) : "Chưa nhập",
                 String.format("%,.0f", b.getTotalAmount()),
                 paid ? "Đã thanh toán" : "Chưa thanh toán",
                 UIUtils.translateStatus(b.getStatus())

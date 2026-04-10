@@ -12,6 +12,8 @@ public class Booking {
     private LocalDate bookingDate;
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
+    private LocalDate expectedCheckOutDate; // Ngày checkout dự kiến
+    private LocalDate actualCheckOutDate;   // Ngày checkout thực tế
 
     public Booking() {}
 
@@ -41,4 +43,10 @@ public class Booking {
 
     public LocalDate getCheckOutDate() { return checkOutDate; }
     public void setCheckOutDate(LocalDate checkOutDate) { this.checkOutDate = checkOutDate; }
+
+    public LocalDate getExpectedCheckOutDate() { return expectedCheckOutDate; }
+    public void setExpectedCheckOutDate(LocalDate expectedCheckOutDate) { this.expectedCheckOutDate = expectedCheckOutDate; }
+
+    public LocalDate getActualCheckOutDate() { return actualCheckOutDate; }
+    public void setActualCheckOutDate(LocalDate actualCheckOutDate) { this.actualCheckOutDate = actualCheckOutDate; }
 }

@@ -1,3 +1,4 @@
+```
 # Compiled and binary files
 *.class
 *.o
@@ -9,59 +10,54 @@
 *.out
 
 # Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-target/
-.gradle/
+lib/
+libs/
+dependency/
+dependencies/
 
 # Build artifacts
-dist/
+target/
 build/
+dist/
+out/
+bin/
+obj/
 
-# IDE and editor files
-.vscode/
+# IDE files
 .idea/
+.vscode/
 *.swp
 *.swo
 *.tmp
 
-# System files
-.DS_Store
-Thumbs.db
+# Logs
+*.log
+
+# Environment
 .env
 .env.local
 *.env.*
 
-# Logs and coverage
-*.log
+# Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# Gradle (since this appears to be Java)
+.gradle/
+!gradle/wrapper/
+
+# Package manager specific
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python-version
+pip-log.txt
+pip-delete-this-directory.txt
+
+# System files
+.DS_Store
+Thumbs.db
+```
