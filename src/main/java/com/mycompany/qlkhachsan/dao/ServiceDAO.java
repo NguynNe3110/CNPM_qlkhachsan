@@ -89,4 +89,17 @@ public class ServiceDAO implements BaseDAO<Service> {
         }
         return false;
     }
+    
+    /** Kiểm tra tên dịch vụ đã tồn tại chưa (loại trừ id hiện tại khi update) */
+    public boolean isServiceNameTaken(String serviceName, int excludeId) {
+        try (Connection con = DBConfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(
+                     "SELECT COUNT(*) FROM Service WHERE name = ? AND id != ?")) {
+            ps.setString(1, serviceName); ps.setInt(2, excludeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
+    }
 }

@@ -105,13 +105,15 @@ public class AdminDashboard extends JFrame {
         JButton btnAdd    = UIUtils.makeButton("➕ Thêm tài khoản", new Color(144, 238, 144));
         JButton btnEdit   = UIUtils.makeButton("✏ Sửa",            new Color(255, 215, 0));
         JButton btnDisable = UIUtils.makeButton("🚫 Vô hiệu hóa",  new Color(255, 160, 122));
+        JButton btnEnable  = UIUtils.makeButton("🔓 Mở khóa",      new Color(100, 200, 100));
 
         btnAdd.addActionListener(e -> doAddAccount());
         btnEdit.addActionListener(e -> doEditAccount(table));
         btnDisable.addActionListener(e -> doDisableAccount(table));
+        btnEnable.addActionListener(e -> doEnableAccount(table));
 
         JPanel bot = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        bot.add(btnAdd); bot.add(btnEdit); bot.add(btnDisable);
+        bot.add(btnAdd); bot.add(btnEdit); bot.add(btnDisable); bot.add(btnEnable);
 
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(15, 15, 10, 15));
@@ -208,6 +210,26 @@ public class AdminDashboard extends JFrame {
         if (!UIUtils.confirm(this, "Vô hiệu hóa tài khoản này?")) return;
         accountDAO.delete(id);
         loadAccountData();
+    }
+
+    private void doEnableAccount(JTable table) {
+        if (!UIUtils.requireSelection(this, table)) return;
+        int id = (int) accountModel.getValueAt(table.getSelectedRow(), 0);
+        Account a = accountDAO.getById(id);
+        if (a == null) {
+            UIUtils.showError(this, "Không tìm thấy tài khoản!"); return;
+        }
+        if (a.isEnable()) {
+            UIUtils.showInfo(this, "Tài khoản này đã được kích hoạt!"); return;
+        }
+        if (!UIUtils.confirm(this, "Mở khóa tài khoản này?")) return;
+        a.setEnable(true);
+        if (accountDAO.update(a)) {
+            loadAccountData();
+            UIUtils.showInfo(this, "Mở khóa tài khoản thành công!");
+        } else {
+            UIUtils.showError(this, "Mở khóa tài khoản thất bại.");
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -343,6 +365,13 @@ public class AdminDashboard extends JFrame {
 
         String num = fNum.getText().trim(), type = fType.getText().trim();
         if (num.isEmpty() || type.isEmpty()) { UIUtils.showError(this, "Số phòng và loại không được để trống."); return; }
+        
+        // Kiểm tra trùng số phòng
+        if (roomDAO.isRoomNumberTaken(num, 0)) {
+            UIUtils.showError(this, "Số phòng \"" + num + "\" đã tồn tại!");
+            return;
+        }
+        
         try {
             double price = Double.parseDouble(fPrice.getText().trim());
             Room r = new Room();
@@ -555,14 +584,20 @@ public class AdminDashboard extends JFrame {
         if (name.isEmpty()) { UIUtils.showError(this, "Tên dịch vụ không được để trống."); return; }
 
         // Kiểm tra trùng tên
-        for (Service sv : serviceDAO.getAll())
-            if (sv.getName().equalsIgnoreCase(name)) {
-                UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!"); return;
-            }
+        if (serviceDAO.isServiceNameTaken(name, 0)) {
+            UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!");
+            return;
+        }
 
         try {
+            double price = Double.parseDouble(fPrice.getText().trim());
+            // Yêu cầu giá tối thiểu 1.000 VNĐ
+            if (price < 1000) {
+                UIUtils.showError(this, "Đơn giá phải lớn hơn hoặc bằng 1.000 VNĐ!");
+                return;
+            }
             Service s = new Service();
-            s.setName(name); s.setPrice(Double.parseDouble(fPrice.getText().trim()));
+            s.setName(name); s.setPrice(price);
             if (serviceDAO.add(s)) { loadServiceData(); UIUtils.showInfo(this, "Thêm dịch vụ thành công!"); }
         } catch (NumberFormatException ex) { UIUtils.showError(this, "Đơn giá không hợp lệ."); }
     }
@@ -585,12 +620,21 @@ public class AdminDashboard extends JFrame {
 
         String name = fName.getText().trim();
         if (name.isEmpty()) { UIUtils.showError(this, "Tên không được để trống."); return; }
-        for (Service sv : serviceDAO.getAll())
-            if (sv.getName().equalsIgnoreCase(name) && sv.getId() != id) {
-                UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!"); return;
-            }
+        
+        // Kiểm tra trùng tên (loại trừ id hiện tại)
+        if (serviceDAO.isServiceNameTaken(name, id)) {
+            UIUtils.showError(this, "Tên dịch vụ \"" + name + "\" đã tồn tại!");
+            return;
+        }
+        
         try {
-            s.setName(name); s.setPrice(Double.parseDouble(fPrice.getText().trim()));
+            double price = Double.parseDouble(fPrice.getText().trim());
+            // Yêu cầu giá tối thiểu 1.000 VNĐ
+            if (price < 1000) {
+                UIUtils.showError(this, "Đơn giá phải lớn hơn hoặc bằng 1.000 VNĐ!");
+                return;
+            }
+            s.setName(name); s.setPrice(price);
             if (serviceDAO.update(s)) { loadServiceData(); UIUtils.showInfo(this, "Cập nhật thành công!"); }
         } catch (NumberFormatException ex) { UIUtils.showError(this, "Đơn giá không hợp lệ."); }
     }

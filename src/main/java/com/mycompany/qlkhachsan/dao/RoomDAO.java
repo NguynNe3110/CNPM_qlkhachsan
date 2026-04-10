@@ -101,4 +101,17 @@ public class RoomDAO implements BaseDAO<Room> {
         }
         return false;
     }
+    
+    /** Kiểm tra số phòng đã tồn tại chưa (loại trừ id hiện tại khi update) */
+    public boolean isRoomNumberTaken(String roomNumber, int excludeId) {
+        try (Connection con = DBConfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(
+                     "SELECT COUNT(*) FROM ROOM WHERE roomNumber = ? AND id != ?")) {
+            ps.setString(1, roomNumber); ps.setInt(2, excludeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
+    }
 }
