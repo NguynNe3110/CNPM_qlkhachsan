@@ -39,7 +39,9 @@ public class DatabaseInitializer {
                 "totalAmount DOUBLE DEFAULT 0, " +
                 "bookingDate DATE, " +
                 "checkInDate DATE, " +
-                "checkOutDate DATE)",
+                "checkOutDate DATE, " +
+                "expectedCheckOutDate DATE, " +
+                "actualCheckOutDate DATE)",
 
             "CREATE TABLE IF NOT EXISTS Service (" +
                 "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -66,6 +68,8 @@ public class DatabaseInitializer {
             "ALTER TABLE Booking ADD COLUMN bookingDate DATE",
             "ALTER TABLE Booking ADD COLUMN checkInDate DATE",
             "ALTER TABLE Booking ADD COLUMN checkOutDate DATE",
+            "ALTER TABLE Booking ADD COLUMN expectedCheckOutDate DATE",
+            "ALTER TABLE Booking ADD COLUMN actualCheckOutDate DATE",
             "ALTER TABLE Payment ADD CONSTRAINT uq_payment_booking UNIQUE (bookingId)"
         };
 
