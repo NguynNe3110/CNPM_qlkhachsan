@@ -4,54 +4,41 @@
 *.o
 *.obj
 *.out
+build/
+target/
 
 # Dependencies
-lib/
-libs/
-dependency/
-dependencies/
-
-# Build artifacts
-target/
-*.properties
-build/
-out/
-bin/
-obj/
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
 .gradle/
 
-# IDE files
-*.swp
-*.swo
-*.tmp
-
-# Logs
+# Logs and temp files
 *.log
+*.tmp
+*.swp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Gradle (since this appears to be Java)
-.gradle/
-!gradle/wrapper/
-
-# Package manager specific
-node_modules/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python-version
-pip-log.txt
-pip-delete-this-directory.txt
-
-# System files
-.DS_Store
-Thumbs.db
-
 # Editors
 .vscode/
 .idea/
+
+# Database dumps
+*.sql
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# OS generated files
+.DS_Store
+Thumbs.db
 ```

@@ -371,7 +371,7 @@ public class StaffDashboard extends JFrame {
         }
 
         if (!UIUtils.confirm(this, String.format(
-                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,d VNĐ<br><b>Khách:</b> %s<br><b>Checkout dự kiến:</b> %s</html>",
+                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s<br><b>Checkout dự kiến:</b> %s</html>",
                 room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName(), expectedCheckOut.format(DATE_FMT)))) return;
 
         Booking b = new Booking();
