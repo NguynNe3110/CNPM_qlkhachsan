@@ -1,32 +1,13 @@
---nhân viên: 
-phải chọn phòng mới nhập id tt khách
-xem tt người thuê trong phòng
-ngày check-in , ngày check-out, ngày booking
-tìm kiếm để trống
-thêm khách để trống
-tổng giá tiền, chưa hiển thị hóa đơn(để xem tổng tiền + dịch vụ đã sử dụng nếu có). 
-chỉ ấn thanh toán 1 lần cho 1 lần checkout/phòng thuê, kh ấn thanh toán lại lần nữa
-khi ấn thanh toán, thì cập nhật lại trạng thái hiển thị -> đã thanh toán.  xác nhận checkout thì trạng thái thành checkout
-chưa có add/xóa dịch vụ vào cho phòng (đang được thuê)
-giao diện booking&checkout: thêm cột trạng thái thanh toán.
+các yêu cầu bên tác nhân nhân viên: 
 
---admin
+- khi checkin phải nhập thời gian (thời gian checkin lấy thời gian hiện tại(đang đúng rồi) nhưng cần phải nhập thời gian checkout (đây là checkout dự kiến) có thêm 1 cột ngày checkout thực tế để phòng khi checkout sớm hoặc muộn hơn ngày dự kiến )
+- nên hiển thị thời gian checkout dự kiến ở tab quản lý booking  & trả phòng
+- tìm kiếm khách hàng không được để trống khi tìm
+- chưa có phần thêm dịch vụ vào cho phòng (nên set mặc định tất cả phòng đều dùng các dịch vụ đang có, nhưng có thể xóa dịch vụ trong phòng nếu phòng đó không có nhu cầu)
 
-đặt phòng checkin
-sửa thông tin dịch vụ (cả tên và giá)
-sửa tt phòng khi phòng còn trống, nếu có người thuê thì ném ra (có thể sửa toàn bộ thông tin như lúc tạo phòng)
-chuột phải vào 1 dòng trong table để có thể thao tác với phòng như sửa, chuyển trạng thái phòng (bảo trì, cần nâng cấp,...)
-độ dài cccd =12, sdt = 10.  chỉ đc nhập số và không được trùng 
-phần thêm dịch vụ: giao diện thêm giá và tên cùng lúc, không được tách ra làm 2 lần, check lỗi &ném dialog nếu trùng tên
-giao diện danh sách booking: thêm cột trạng thái thanh toán
-	
-	
---cả 2 tác nhân
-thiếu nút đăng xuất
-mã hóa các tên trạng thái sang tiếng việt khi xuất giao diện 
-mã hóa mật khẩu, tối thiểu 6 ký tự
-giao diện ở table không được click vào từng ô một, các cột không được di chuyển (table không được chỉnh sửa chỉ được click)
-username & CCCD không được trùng nhau, nếu lỗi thì hiển thị dialog
-mã hóa mật khẩu, tối thiểu 6 ký 
-khi không chọn item trong table thì phải hiện dialog
-khi thanh toán,checkout, hay xóa, vô hiệu hóa thì có dialog hỏi xác nhận
+các yêu cầu bên tác nhân admin:
+
+- phần quản lý tài khoản, phải cho mở lại tài khoản (hiện tại chỉ khóa, không mở lại được được)
+- phần thống kê tôi nghĩ là để dạng bảng cho dễ nhìn
+
+
