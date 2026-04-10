@@ -20,9 +20,13 @@ public class BookingDAO implements BaseDAO<Booking> {
         Date bd = rs.getDate("bookingDate");
         Date ci = rs.getDate("checkInDate");
         Date co = rs.getDate("checkOutDate");
+        Date eco = rs.getDate("expectedCheckOutDate");
+        Date aco = rs.getDate("actualCheckOutDate");
         if (bd != null) b.setBookingDate(bd.toLocalDate());
         if (ci != null) b.setCheckInDate(ci.toLocalDate());
         if (co != null) b.setCheckOutDate(co.toLocalDate());
+        if (eco != null) b.setExpectedCheckOutDate(eco.toLocalDate());
+        if (aco != null) b.setActualCheckOutDate(aco.toLocalDate());
         return b;
     }
 
@@ -66,7 +70,7 @@ public class BookingDAO implements BaseDAO<Booking> {
 
     @Override
     public boolean add(Booking b) {
-        String sql = "INSERT INTO Booking (customerId, roomId, staffId, status, totalAmount, bookingDate, checkInDate, checkOutDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Booking (customerId, roomId, staffId, status, totalAmount, bookingDate, checkInDate, checkOutDate, expectedCheckOutDate, actualCheckOutDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection con = DBConfig.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, b.getCustomerId());
@@ -77,6 +81,8 @@ public class BookingDAO implements BaseDAO<Booking> {
             ps.setDate(6, b.getBookingDate() != null ? Date.valueOf(b.getBookingDate()) : Date.valueOf(LocalDate.now()));
             ps.setDate(7, b.getCheckInDate() != null ? Date.valueOf(b.getCheckInDate()) : null);
             ps.setDate(8, b.getCheckOutDate() != null ? Date.valueOf(b.getCheckOutDate()) : null);
+            ps.setDate(9, b.getExpectedCheckOutDate() != null ? Date.valueOf(b.getExpectedCheckOutDate()) : null);
+            ps.setDate(10, b.getActualCheckOutDate() != null ? Date.valueOf(b.getActualCheckOutDate()) : null);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) { e.printStackTrace(); }
         return false;
@@ -84,7 +90,7 @@ public class BookingDAO implements BaseDAO<Booking> {
 
     @Override
     public boolean update(Booking b) {
-        String sql = "UPDATE Booking SET customerId=?, roomId=?, staffId=?, status=?, totalAmount=?, bookingDate=?, checkInDate=?, checkOutDate=? WHERE id=?";
+        String sql = "UPDATE Booking SET customerId=?, roomId=?, staffId=?, status=?, totalAmount=?, bookingDate=?, checkInDate=?, checkOutDate=?, expectedCheckOutDate=?, actualCheckOutDate=? WHERE id=?";
         try (Connection con = DBConfig.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, b.getCustomerId());
@@ -95,7 +101,9 @@ public class BookingDAO implements BaseDAO<Booking> {
             ps.setDate(6, b.getBookingDate() != null ? Date.valueOf(b.getBookingDate()) : null);
             ps.setDate(7, b.getCheckInDate() != null ? Date.valueOf(b.getCheckInDate()) : null);
             ps.setDate(8, b.getCheckOutDate() != null ? Date.valueOf(b.getCheckOutDate()) : null);
-            ps.setInt(9, b.getId());
+            ps.setDate(9, b.getExpectedCheckOutDate() != null ? Date.valueOf(b.getExpectedCheckOutDate()) : null);
+            ps.setDate(10, b.getActualCheckOutDate() != null ? Date.valueOf(b.getActualCheckOutDate()) : null);
+            ps.setInt(11, b.getId());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) { e.printStackTrace(); }
         return false;
