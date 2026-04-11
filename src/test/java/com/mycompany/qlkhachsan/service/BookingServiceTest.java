@@ -32,14 +32,13 @@ public class BookingServiceTest {
         int bookingId = 1;
         Payment unpaid = new Payment();
         unpaid.setBookingId(bookingId);
-        unpaid.setStatus("UNPAID");
+        unpaid.setStatus("UNPAID"); 
         
         when(paymentDAO.getAll()).thenReturn(Arrays.asList(unpaid));
 
         String result = bookingService.checkOut(bookingId);
 
-        assertTrue(result.contains("CHECKOUT_FAILED"),
-         "Loi: He thong phai tu choi Check-out khi chua hoan tat thanh toan.");
+        assertTrue(result.contains("CHECKOUT_FAILED"), "Loi: He thong phai tu choi Check-out khi chua hoan tat thanh toan.");
         verify(bookingDAO, never()).update(any());
     }
 
@@ -48,7 +47,7 @@ public class BookingServiceTest {
         int bookingId = 1;
         Payment paid = new Payment();
         paid.setBookingId(bookingId);
-        paid.setStatus("PAID");
+        paid.setStatus("PAID"); 
 
         Booking b = new Booking();
         b.setId(bookingId);
