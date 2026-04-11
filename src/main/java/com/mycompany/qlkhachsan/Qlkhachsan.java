@@ -5,7 +5,6 @@ import com.mycompany.qlkhachsan.dao.AccountDAO;
 import com.mycompany.qlkhachsan.util.DatabaseInitializer;
 import com.mycompany.qlkhachsan.view.LoginForm;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 
 public class Qlkhachsan {
 

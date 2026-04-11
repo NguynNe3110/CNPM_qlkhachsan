@@ -5,8 +5,6 @@ import com.mycompany.qlkhachsan.model.Account;
 import com.mycompany.qlkhachsan.view.AdminDashboard;
 import com.mycompany.qlkhachsan.view.LoginForm;
 import com.mycompany.qlkhachsan.view.StaffDashboard;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 public class LoginController {
     private LoginForm view;
