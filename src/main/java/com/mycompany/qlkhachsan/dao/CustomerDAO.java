@@ -42,6 +42,20 @@ public class CustomerDAO implements BaseDAO<Customer> {
         return null;
     }
 
+    /** Tìm khách hàng chính xác theo CCCD/CMND */
+    public Customer findByIdentityNumber(String identityNumber) {
+        String sql = "SELECT * FROM Customer WHERE identityNumber = ?";
+        try (Connection con = DBConfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, identityNumber);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapRow(rs);
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
+    }
+
+
     public List<Customer> search(String query) {
         List<Customer> list = new ArrayList<>();
         if (query == null || query.isBlank()) return getAll();

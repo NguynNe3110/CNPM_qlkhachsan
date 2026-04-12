@@ -327,25 +327,8 @@ public class StaffDashboard extends JFrame {
             return;
         }
 
-        // Chọn khách
-        String[] opts = {"Khách hiện có (nhập ID)", "Tạo khách mới"};
-        int choice = JOptionPane.showOptionDialog(this,
-            "Phòng " + room.getRoomNumber() + " - Chọn cách nhập khách hàng:",
-            "Check-in", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-            null, opts, opts[0]);
-        if (choice < 0) return;
-
-        Customer customer = null;
-        if (choice == 0) {
-            String s = JOptionPane.showInputDialog(this, "Nhập ID khách hàng:");
-            if (s == null || s.trim().isEmpty()) return;
-            try { customer = customerDAO.getById(Integer.parseInt(s.trim())); }
-            catch (NumberFormatException ex) { UIUtils.showError(this, "ID không hợp lệ."); return; }
-            if (customer == null) { UIUtils.showError(this, "Không tìm thấy khách."); return; }
-        } else {
-            customer = doCreateCustomerInline();
-            if (customer == null) return;
-        }
+        Customer customer = resolveCustomerForCheckIn();
+        if (customer == null) return;
 
         // Nhập thông tin check-in với DateTimePicker
         JPanel infoPanel = new JPanel(new GridLayout(0, 2, 8, 8));
@@ -396,8 +379,9 @@ public class StaffDashboard extends JFrame {
         }
 
         if (!UIUtils.confirm(this, String.format(
-                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s<br><b>Checkout dự kiến:</b> %s</html>",
-                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName(), expectedCheckOut.format(DATE_FMT)))) return;
+                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s<br><b>CCCD:</b> %s<br><b>Checkout dự kiến:</b> %s</html>",
+                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName(),
+                customer.getIdentityNumber(), expectedCheckOut.format(DATE_FMT)))) return;
 
         Booking b = new Booking();
         b.setCustomerId(customer.getId()); b.setRoomId(room.getId());
@@ -412,24 +396,81 @@ public class StaffDashboard extends JFrame {
         } else UIUtils.showError(this, "Check-in thất bại.");
     }
 
-    private Customer doCreateCustomerInline() {
-        JTextField fName = new JTextField(20), fPhone = new JTextField(20), fCCCD = new JTextField(20);
+    private Customer resolveCustomerForCheckIn() {
+        while (true) {
+            String cccd = JOptionPane.showInputDialog(this, "Nhập CCCD khách hàng (12 số):");
+            if (cccd == null) return null;
+            cccd = cccd.trim();
+
+            if (!UIUtils.isValidCCCD(cccd)) {
+                UIUtils.showError(this, "CCCD phải đúng 12 chữ số.");
+                continue;
+            }
+
+            Customer existing = customerDAO.findByIdentityNumber(cccd);
+            if (existing != null) {
+                JPanel info = buildForm(
+                    "Họ tên:", new JLabel(existing.getName()),
+                    "SĐT:", new JLabel(existing.getPhone()),
+                    "CCCD:", new JLabel(existing.getIdentityNumber())
+                );
+                int useExisting = JOptionPane.showConfirmDialog(
+                    this,
+                    info,
+                    "Đã tìm thấy khách hàng trong hệ thống",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.PLAIN_MESSAGE
+                );
+                return useExisting == JOptionPane.OK_OPTION ? existing : null;
+            }
+
+            if (!UIUtils.confirm(this, "Không tìm thấy khách với CCCD này. Bạn có muốn thêm khách hàng mới không?")) {
+                return null;
+            }
+            Customer newCustomer = doCreateCustomerInline(cccd);
+            if (newCustomer != null) {
+                return newCustomer;
+            }
+        }
+    }
+
+    private Customer doCreateCustomerInline(String defaultCCCD) {
+        JTextField fName = new JTextField(20), fPhone = new JTextField(20), fCCCD = new JTextField(defaultCCCD, 20);
         JPanel form = buildForm("Họ tên:", fName, "SĐT (10 số):", fPhone, "CCCD (12 số):", fCCCD);
 
-        if (JOptionPane.showConfirmDialog(this, form, "Thêm khách mới",
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return null;
+        while (true) {
+            if (JOptionPane.showConfirmDialog(this, form, "Thêm khách mới",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return null;
 
-        String name = fName.getText().trim(), phone = fPhone.getText().trim(), cccd = fCCCD.getText().trim();
-        if (name.isEmpty())                    { UIUtils.showError(this, "Tên không được để trống."); return null; }
-        if (!UIUtils.isValidPhone(phone))       { UIUtils.showError(this, "SĐT phải đúng 10 chữ số."); return null; }
-        if (!UIUtils.isValidCCCD(cccd))         { UIUtils.showError(this, "CCCD phải đúng 12 chữ số."); return null; }
-        if (customerDAO.isPhoneTaken(phone, 0)) { UIUtils.showError(this, "SĐT đã tồn tại."); return null; }
-        if (customerDAO.isCCCDTaken(cccd, 0))   { UIUtils.showError(this, "CCCD đã tồn tại."); return null; }
+            String name = fName.getText().trim(), phone = fPhone.getText().trim(), cccd = fCCCD.getText().trim();
+            if (name.isEmpty()) {
+                UIUtils.showError(this, "Tên không được để trống.");
+                continue;
+            }
+            if (!UIUtils.isValidPhone(phone)) {
+                UIUtils.showError(this, "SĐT phải đúng 10 chữ số.");
+                continue;
+            }
+            if (!UIUtils.isValidCCCD(cccd)) {
+                UIUtils.showError(this, "CCCD phải đúng 12 chữ số.");
+                continue;
+            }
+            if (customerDAO.isPhoneTaken(phone, 0)) {
+                UIUtils.showError(this, "SĐT đã tồn tại.");
+                continue;
+            }
+            if (customerDAO.isCCCDTaken(cccd, 0)) {
+                UIUtils.showError(this, "CCCD đã tồn tại.");
+                continue;
+            }
 
-        Customer c = new Customer(); c.setName(name); c.setPhone(phone); c.setIdentityNumber(cccd);
-        if (!customerDAO.add(c)) { UIUtils.showError(this, "Thêm khách thất bại."); return null; }
-        List<Customer> list = customerDAO.search(phone);
-        return list.isEmpty() ? null : list.get(0);
+            Customer c = new Customer(); c.setName(name); c.setPhone(phone); c.setIdentityNumber(cccd);
+            if (!customerDAO.add(c)) {
+                UIUtils.showError(this, "Thêm khách thất bại.");
+                continue;
+            }
+            return customerDAO.findByIdentityNumber(cccd);
+        }
     }
 
     private String getRawRoomStatus(int viewRow) {

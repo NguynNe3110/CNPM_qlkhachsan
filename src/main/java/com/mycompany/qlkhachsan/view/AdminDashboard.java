@@ -476,29 +476,13 @@ public class AdminDashboard extends JFrame {
             UIUtils.showError(this, "Chỉ có thể check-in phòng đang TRỐNG!"); return;
         }
 
-        // Chọn khách
-        String[] opts = {"Khách hiện có (nhập ID)", "Tạo khách mới"};
-        int choice = JOptionPane.showOptionDialog(this,
-            "Phòng " + room.getRoomNumber() + " - Chọn cách nhập khách hàng:",
-            "Check-in (Admin)", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-            null, opts, opts[0]);
-        if (choice < 0) return;
-
-        Customer customer = null;
-        if (choice == 0) {
-            String s = JOptionPane.showInputDialog(this, "Nhập ID khách hàng:");
-            if (s == null || s.trim().isEmpty()) return;
-            try { customer = customerDAO.getById(Integer.parseInt(s.trim())); }
-            catch (NumberFormatException ex) { UIUtils.showError(this, "ID không hợp lệ."); return; }
-            if (customer == null) { UIUtils.showError(this, "Không tìm thấy khách."); return; }
-        } else {
-            customer = doCreateCustomerInline();
-            if (customer == null) return;
-        }
+        Customer customer = resolveCustomerForCheckIn();
+        if (customer == null) return;
 
         if (!UIUtils.confirm(this, String.format(
-                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s</html>",
-                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName()))) return;
+                "<html>Xác nhận Check-in?<br><b>Phòng:</b> %s (%s) - %,.0f VNĐ<br><b>Khách:</b> %s<br><b>CCCD:</b> %s</html>",
+                room.getRoomNumber(), room.getType(), room.getPrice(), customer.getName(),
+                customer.getIdentityNumber()))) return;
 
         Booking b = new Booking();
         b.setCustomerId(customer.getId()); b.setRoomId(room.getId());
@@ -513,28 +497,86 @@ public class AdminDashboard extends JFrame {
         } else UIUtils.showError(this, "Check-in thất bại.");
     }
 
-    private Customer doCreateCustomerInline() {
-        JTextField fName = new JTextField(20), fPhone = new JTextField(20), fCCCD = new JTextField(20);
+    private Customer resolveCustomerForCheckIn() {
+        while (true) {
+            String cccd = JOptionPane.showInputDialog(this, "Nhập CCCD khách hàng (12 số):");
+            if (cccd == null) return null;
+            cccd = cccd.trim();
+
+            if (!UIUtils.isValidCCCD(cccd)) {
+                UIUtils.showError(this, "CCCD phải đúng 12 chữ số.");
+                continue;
+            }
+
+            Customer existing = customerDAO.findByIdentityNumber(cccd);
+            if (existing != null) {
+                JPanel info = new JPanel(new GridLayout(0, 2, 8, 8));
+                info.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                info.add(new JLabel("Họ tên:")); info.add(new JLabel(existing.getName()));
+                info.add(new JLabel("SĐT:")); info.add(new JLabel(existing.getPhone()));
+                info.add(new JLabel("CCCD:")); info.add(new JLabel(existing.getIdentityNumber()));
+                int useExisting = JOptionPane.showConfirmDialog(
+                    this,
+                    info,
+                    "Đã tìm thấy khách hàng trong hệ thống",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.PLAIN_MESSAGE
+                );
+                return useExisting == JOptionPane.OK_OPTION ? existing : null;
+            }
+
+            if (!UIUtils.confirm(this, "Không tìm thấy khách với CCCD này. Bạn có muốn thêm khách hàng mới không?")) {
+                return null;
+            }
+            Customer newCustomer = doCreateCustomerInline(cccd);
+            if (newCustomer != null) {
+                return newCustomer;
+            }
+        }
+    }
+
+    private Customer doCreateCustomerInline(String defaultCCCD) {
+        JTextField fName = new JTextField(20), fPhone = new JTextField(20), fCCCD = new JTextField(defaultCCCD, 20);
         JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
         form.add(new JLabel("Họ tên:")); form.add(fName);
         form.add(new JLabel("SĐT (10 số):")); form.add(fPhone);
         form.add(new JLabel("CCCD (12 số):")); form.add(fCCCD);
 
-        if (JOptionPane.showConfirmDialog(this, form, "Thêm khách mới",
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return null;
+        while (true) {
+            if (JOptionPane.showConfirmDialog(this, form, "Thêm khách mới",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return null;
 
-        String name = fName.getText().trim(), phone = fPhone.getText().trim(), cccd = fCCCD.getText().trim();
-        if (name.isEmpty())                    { UIUtils.showError(this, "Tên không được để trống."); return null; }
-        if (!UIUtils.isValidPhone(phone))       { UIUtils.showError(this, "SĐT phải đúng 10 chữ số."); return null; }
-        if (!UIUtils.isValidCCCD(cccd))         { UIUtils.showError(this, "CCCD phải đúng 12 chữ số."); return null; }
-        if (customerDAO.isPhoneTaken(phone, 0)) { UIUtils.showError(this, "SĐT đã tồn tại."); return null; }
-        if (customerDAO.isCCCDTaken(cccd, 0))   { UIUtils.showError(this, "CCCD đã tồn tại."); return null; }
+            String name = fName.getText().trim(), phone = fPhone.getText().trim(), cccd = fCCCD.getText().trim();
+            if (name.isEmpty()) {
+                UIUtils.showError(this, "Tên không được để trống.");
+                continue;
+            }
+            if (!UIUtils.isValidPhone(phone)) {
+                UIUtils.showError(this, "SĐT phải đúng 10 chữ số.");
+                continue;
+            }
+            if (!UIUtils.isValidCCCD(cccd)) {
+                UIUtils.showError(this, "CCCD phải đúng 12 chữ số.");
+                continue;
+            }
+            if (customerDAO.isPhoneTaken(phone, 0)) {
+                UIUtils.showError(this, "SĐT đã tồn tại.");
+                continue;
+            }
+            if (customerDAO.isCCCDTaken(cccd, 0)) {
+                UIUtils.showError(this, "CCCD đã tồn tại.");
+                continue;
+            }
 
-        Customer c = new Customer(); c.setName(name); c.setPhone(phone); c.setIdentityNumber(cccd);
-        if (!customerDAO.add(c)) { UIUtils.showError(this, "Thêm khách thất bại."); return null; }
-        List<Customer> list = customerDAO.search(phone);
-        return list.isEmpty() ? null : list.get(0);
+            Customer c = new Customer(); c.setName(name); c.setPhone(phone); c.setIdentityNumber(cccd);
+            if (!customerDAO.add(c)) {
+                UIUtils.showError(this, "Thêm khách thất bại.");
+                continue;
+            }
+            return customerDAO.findByIdentityNumber(cccd);
+        }
     }
+
 
     private void doRemoveRoom(JTable table) {
         if (!UIUtils.requireSelection(this, table)) return;
@@ -792,54 +834,102 @@ public class AdminDashboard extends JFrame {
         JPanel p = new JPanel(new BorderLayout(10, 10));
         p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        JButton btnCalc = UIUtils.makeButton("📊 Tính thống kê", new Color(100, 149, 237));
+        Integer[] months = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+        JComboBox<Integer> cbMonth = new JComboBox<>(months);
+
+        java.util.Set<Integer> years = new java.util.LinkedHashSet<>();
+        years.add(LocalDate.now().getYear());
+        for (Booking b : bookingDAO.getAll()) {
+            if (b.getBookingDate() != null) years.add(b.getBookingDate().getYear());
+            if (b.getCheckInDate() != null) years.add(b.getCheckInDate().getYear());
+            if (b.getCheckOutDate() != null) years.add(b.getCheckOutDate().getYear());
+        }
+        Integer[] yearOptions = years.stream().sorted().toArray(Integer[]::new);
+        JComboBox<Integer> cbYear = new JComboBox<>(yearOptions);
+
+        cbMonth.setSelectedItem(LocalDate.now().getMonthValue());
+        cbYear.setSelectedItem(LocalDate.now().getYear());
+
+        JButton btnCalc = UIUtils.makeButton("📊 Xem thống kê", new Color(100, 149, 237));
         JTextArea txtResult = new JTextArea(20, 60);
         txtResult.setEditable(false);
         txtResult.setFont(new Font("Monospaced", Font.PLAIN, 13));
         txtResult.setLineWrap(true);
+        txtResult.setWrapStyleWord(true);
+
+        txtResult.setText(buildStatsReport((int) cbMonth.getSelectedItem(), (int) cbYear.getSelectedItem()));
 
         btnCalc.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder();
-            sb.append("══════════════════════════════════════════════\n");
-            sb.append("         BÁO CÁO THỐNG KÊ KHÁCH SẠN\n");
-            sb.append("══════════════════════════════════════════════\n\n");
+            int selectedMonth = (int) cbMonth.getSelectedItem();
+            int selectedYear = (int) cbYear.getSelectedItem();
+            txtResult.setText(buildStatsReport(selectedMonth, selectedYear));
+        });
 
-            // Doanh thu tổng
-            double totalRevenue = 0;
-            List<Payment> payments = paymentDAO.getAll();
-            for (Payment pay : payments)
-                if ("PAID".equals(pay.getStatus())) totalRevenue += pay.getAmount();
-            sb.append(String.format("💰 TỔNG DOANH THU: %,.0f VNĐ%n%n", totalRevenue));
+        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        top.add(new JLabel("  THỐNG KÊ & BÁO CÁO DOANH THU"));
+        top.add(Box.createHorizontalStrut(20));
+        top.add(new JLabel("Tháng:"));
+        top.add(cbMonth);
+        top.add(new JLabel("Năm:"));
+        top.add(cbYear);
+        top.add(btnCalc);
 
-            // Thống kê phòng
-            List<Room> rooms = roomDAO.getAll();
-            long totalRooms    = rooms.stream().filter(Room::isEnable).count();
-            long emptyRooms    = rooms.stream().filter(r -> r.isEnable() && "EMPTY".equals(r.getStatus())).count();
-            long occupiedRooms = rooms.stream().filter(r -> r.isEnable() && "OCCUPIED".equals(r.getStatus())).count();
-            long maintenRooms  = rooms.stream().filter(r -> r.isEnable() && "MAINTENANCE".equals(r.getStatus())).count();
-            sb.append(String.format("🏠 PHÒNG: Tổng %d | Trống %d | Đang thuê %d | Bảo trì %d%n%n",
-                totalRooms, emptyRooms, occupiedRooms, maintenRooms));
+        p.add(top, BorderLayout.NORTH);
+        p.add(new JScrollPane(txtResult), BorderLayout.CENTER);
+        return p;
+    }
 
-            // Booking stats
-            List<Booking> bookings = bookingDAO.getAll();
-            long checkedIn  = bookings.stream().filter(b -> "CHECKED_IN".equals(b.getStatus())).count();
-            long checkedOut = bookings.stream().filter(b -> "CHECKED_OUT".equals(b.getStatus())).count();
-            sb.append(String.format("📋 BOOKING: Tổng %d | Đang thuê %d | Đã trả %d%n%n",
-                bookings.size(), checkedIn, checkedOut));
+    private String buildStatsReport(int month, int year) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("══════════════════════════════════════════════\n");
+        sb.append(String.format("   BÁO CÁO THỐNG KÊ THÁNG %02d/%d%n", month, year));
+        sb.append("══════════════════════════════════════════════\n\n");
 
-            // Tần suất sử dụng phòng (top 5) - tối ưu: cache rooms thay vì gọi DB cho mỗi room
-            sb.append("📈 TOP PHÒNG ĐƯỢC THUÊ NHIỀU NHẤT:\n");
-            java.util.Map<Integer, Long> freq = new java.util.HashMap<>();
-            for (Booking b : bookings)
-                freq.merge(b.getRoomId(), 1L, Long::sum);
-            
-            // Cache tất cả rooms vào map để tránh gọi DB nhiều lần
-            java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
-            for (Room r : roomDAO.getAll()) {
-                roomCache.put(r.getId(), r);
+        List<Booking> allBookings = bookingDAO.getAll();
+        List<Booking> periodBookings = new java.util.ArrayList<>();
+        java.util.Map<Integer, Booking> bookingCache = new java.util.HashMap<>();
+        for (Booking b : allBookings) {
+            bookingCache.put(b.getId(), b);
+            if (isBookingInPeriod(b, month, year)) {
+                periodBookings.add(b);
             }
-            
-            freq.entrySet().stream()
+        }
+
+        double totalRevenue = 0;
+        for (Payment pay : paymentDAO.getAll()) {
+            if (!"PAID".equals(pay.getStatus())) continue;
+            Booking b = bookingCache.get(pay.getBookingId());
+            if (b != null && isRevenueInPeriod(b, month, year)) {
+                totalRevenue += pay.getAmount();
+            }
+        }
+        sb.append(String.format("💰 DOANH THU: %,.0f VNĐ%n%n", totalRevenue));
+
+        long checkedIn = periodBookings.stream().filter(b -> "CHECKED_IN".equals(b.getStatus())).count();
+        long checkedOut = periodBookings.stream().filter(b -> "CHECKED_OUT".equals(b.getStatus())).count();
+        long cancelled = periodBookings.stream().filter(b -> "CANCELLED".equals(b.getStatus())).count();
+        sb.append(String.format("📋 BOOKING TRONG KỲ: Tổng %d | Đang thuê %d | Đã trả %d | Đã hủy %d%n%n",
+            periodBookings.size(), checkedIn, checkedOut, cancelled));
+
+        List<Room> rooms = roomDAO.getAll();
+        long totalRooms = rooms.stream().filter(Room::isEnable).count();
+        long emptyRooms = rooms.stream().filter(r -> r.isEnable() && "EMPTY".equals(r.getStatus())).count();
+        long occupiedRooms = rooms.stream().filter(r -> r.isEnable() && "OCCUPIED".equals(r.getStatus())).count();
+        long maintenRooms = rooms.stream().filter(r -> r.isEnable() && "MAINTENANCE".equals(r.getStatus())).count();
+        sb.append(String.format("🏠 TÌNH TRẠNG PHÒNG HIỆN TẠI: Tổng %d | Trống %d | Đang thuê %d | Bảo trì %d%n%n",
+            totalRooms, emptyRooms, occupiedRooms, maintenRooms));
+
+        sb.append("📈 TOP PHÒNG ĐƯỢC THUÊ NHIỀU (TRONG KỲ):\n");
+        java.util.Map<Integer, Long> roomFreq = new java.util.HashMap<>();
+        for (Booking b : periodBookings) roomFreq.merge(b.getRoomId(), 1L, Long::sum);
+
+        java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
+        for (Room r : rooms) roomCache.put(r.getId(), r);
+
+        if (roomFreq.isEmpty()) {
+            sb.append("  • Không có dữ liệu\n");
+        } else {
+            roomFreq.entrySet().stream()
                 .sorted((a, b2) -> Long.compare(b2.getValue(), a.getValue()))
                 .limit(5)
                 .forEach(entry -> {
@@ -847,20 +937,24 @@ public class AdminDashboard extends JFrame {
                     sb.append(String.format("  • Phòng %-6s : %d lần thuê%n",
                         r != null ? r.getRoomNumber() : "#" + entry.getKey(), entry.getValue()));
                 });
+        }
 
-            sb.append("\n── Dịch vụ được dùng nhiều nhất ────────────\n");
-            ServiceUsageDAO suD = new ServiceUsageDAO();
-            java.util.Map<Integer, Long> svFreq = new java.util.HashMap<>();
-            for (ServiceUsage su : suD.getAll())
-                svFreq.merge(su.getServiceId(), (long)su.getQuantity(), Long::sum);
-            
-            // Cache tất cả services vào map để tránh gọi DB nhiều lần
-            java.util.Map<Integer, Service> serviceCache = new java.util.HashMap<>();
-            for (Service sv : serviceDAO.getAll()) {
-                serviceCache.put(sv.getId(), sv);
+        sb.append("\n── Dịch vụ dùng nhiều nhất (trong kỳ) ───────\n");
+        java.util.Map<Integer, Long> serviceFreq = new java.util.HashMap<>();
+        for (ServiceUsage su : new ServiceUsageDAO().getAll()) {
+            Booking b = bookingCache.get(su.getBookingId());
+            if (b != null && isBookingInPeriod(b, month, year)) {
+                serviceFreq.merge(su.getServiceId(), (long) su.getQuantity(), Long::sum);
             }
-            
-            svFreq.entrySet().stream()
+        }
+
+        java.util.Map<Integer, Service> serviceCache = new java.util.HashMap<>();
+        for (Service sv : serviceDAO.getAll()) serviceCache.put(sv.getId(), sv);
+
+        if (serviceFreq.isEmpty()) {
+            sb.append("  • Không có dữ liệu\n");
+        } else {
+            serviceFreq.entrySet().stream()
                 .sorted((a, b2) -> Long.compare(b2.getValue(), a.getValue()))
                 .limit(5)
                 .forEach(entry -> {
@@ -868,21 +962,28 @@ public class AdminDashboard extends JFrame {
                     sb.append(String.format("  • %-20s : %d lần%n",
                         sv != null ? sv.getName() : "#" + entry.getKey(), entry.getValue()));
                 });
+        }
 
-            sb.append("\n── Khách hàng ───────────────────────────────\n");
-            sb.append(String.format("  Tổng số khách: %d%n", customerDAO.getAll().size()));
-            sb.append("\n══════════════════════════════════════════════\n");
-            txtResult.setText(sb.toString());
-        });
+        long distinctCustomers = periodBookings.stream().map(Booking::getCustomerId).distinct().count();
+        sb.append("\n── Khách hàng trong kỳ ─────────────────────\n");
+        sb.append(String.format("  Tổng khách phát sinh booking: %d%n", distinctCustomers));
+        sb.append("\n══════════════════════════════════════════════\n");
+        sb.append("Ghi chú: Do bảng Payment chưa lưu ngày thanh toán, doanh thu kỳ này được tính theo ngày trả phòng (nếu có), nếu chưa có thì theo ngày đặt.\n");
+        return sb.toString();
+    }
 
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        top.add(new JLabel("  THỐNG KÊ & BÁO CÁO DOANH THU"));
-        top.add(Box.createHorizontalStrut(20));
-        top.add(btnCalc);
+    private boolean isBookingInPeriod(Booking booking, int month, int year) {
+        LocalDate date = booking.getBookingDate() != null ? booking.getBookingDate() : booking.getCheckInDate();
+        return isInMonthYear(date, month, year);
+    }
 
-        p.add(top, BorderLayout.NORTH);
-        p.add(new JScrollPane(txtResult), BorderLayout.CENTER);
-        return p;
+    private boolean isRevenueInPeriod(Booking booking, int month, int year) {
+        LocalDate date = booking.getCheckOutDate() != null ? booking.getCheckOutDate() : booking.getBookingDate();
+        return isInMonthYear(date, month, year);
+    }
+
+    private boolean isInMonthYear(LocalDate date, int month, int year) {
+        return date != null && date.getMonthValue() == month && date.getYear() == year;
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────
