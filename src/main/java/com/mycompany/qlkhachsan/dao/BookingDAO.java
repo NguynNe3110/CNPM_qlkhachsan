@@ -17,16 +17,30 @@ public class BookingDAO implements BaseDAO<Booking> {
         b.setStaffId(rs.getInt("staffId"));
         b.setStatus(rs.getString("status"));
         b.setTotalAmount(rs.getDouble("totalAmount"));
+        
         Date bd = rs.getDate("bookingDate");
-        Date ci = rs.getDate("checkInDate");
-        Date co = rs.getDate("checkOutDate");
-        Date eco = rs.getDate("expectedCheckOutDate");
-        Date aco = rs.getDate("actualCheckOutDate");
         if (bd != null) b.setBookingDate(bd.toLocalDate());
-        if (ci != null) b.setCheckInDate(ci.toLocalDate());
-        if (co != null) b.setCheckOutDate(co.toLocalDate());
-        if (eco != null) b.setExpectedCheckOutDate(eco.toLocalDate());
-        if (aco != null) b.setActualCheckOutDate(aco.toLocalDate());
+        
+        try {
+            Date ci = rs.getDate("checkInDate");
+            if (ci != null) b.setCheckInDate(ci.toLocalDate());
+        } catch (SQLException e) { /* column may not exist */ }
+        
+        try {
+            Date co = rs.getDate("checkOutDate");
+            if (co != null) b.setCheckOutDate(co.toLocalDate());
+        } catch (SQLException e) { /* column may not exist */ }
+        
+        try {
+            Date eco = rs.getDate("expectedCheckOutDate");
+            if (eco != null) b.setExpectedCheckOutDate(eco.toLocalDate());
+        } catch (SQLException e) { /* column may not exist */ }
+        
+        try {
+            Date aco = rs.getDate("actualCheckOutDate");
+            if (aco != null) b.setActualCheckOutDate(aco.toLocalDate());
+        } catch (SQLException e) { /* column may not exist */ }
+        
         return b;
     }
 

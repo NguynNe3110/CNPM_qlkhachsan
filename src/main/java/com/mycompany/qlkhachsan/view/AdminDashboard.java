@@ -105,13 +105,15 @@ public class AdminDashboard extends JFrame {
         JButton btnAdd    = UIUtils.makeButton("➕ Thêm tài khoản", new Color(144, 238, 144));
         JButton btnEdit   = UIUtils.makeButton("✏ Sửa",            new Color(255, 215, 0));
         JButton btnDisable = UIUtils.makeButton("🚫 Vô hiệu hóa",  new Color(255, 160, 122));
+        JButton btnEnable = UIUtils.makeButton("✅ Kích hoạt lại", new Color(144, 238, 144));
 
         btnAdd.addActionListener(e -> doAddAccount());
         btnEdit.addActionListener(e -> doEditAccount(table));
         btnDisable.addActionListener(e -> doDisableAccount(table));
+        btnEnable.addActionListener(e -> doEnableAccount(table));
 
         JPanel bot = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        bot.add(btnAdd); bot.add(btnEdit); bot.add(btnDisable);
+        bot.add(btnAdd); bot.add(btnEdit); bot.add(btnDisable); bot.add(btnEnable);
 
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(15, 15, 10, 15));
@@ -208,6 +210,24 @@ public class AdminDashboard extends JFrame {
         if (!UIUtils.confirm(this, "Vô hiệu hóa tài khoản này?")) return;
         accountDAO.delete(id);
         loadAccountData();
+    }
+    
+    private void doEnableAccount(JTable table) {
+        if (!UIUtils.requireSelection(this, table)) return;
+        int id = (int) accountModel.getValueAt(table.getSelectedRow(), 0);
+        Account a = accountDAO.getById(id);
+        if (a == null) { UIUtils.showError(this, "Không tìm thấy tài khoản."); return; }
+        if (a.isEnable()) { UIUtils.showInfo(this, "Tài khoản này đã được kích hoạt rồi."); return; }
+        
+        if (!UIUtils.confirm(this, "Kích hoạt lại tài khoản '" + a.getUserName() + "'?")) return;
+        
+        // Sử dụng phương thức enable trong AccountDAO
+        if (accountDAO.enable(id)) { 
+            loadAccountData(); 
+            UIUtils.showInfo(this, "✅ Đã kích hoạt lại tài khoản '" + a.getUserName() + "'."); 
+        } else {
+            UIUtils.showError(this, "Không thể kích hoạt tài khoản.");
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -731,47 +751,62 @@ public class AdminDashboard extends JFrame {
         p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         JButton btnCalc = UIUtils.makeButton("📊 Tính thống kê", new Color(100, 149, 237));
-        JTextArea txtResult = new JTextArea(20, 60);
-        txtResult.setEditable(false);
-        txtResult.setFont(new Font("Monospaced", Font.PLAIN, 13));
-        txtResult.setLineWrap(true);
+        
+        // Tạo bảng thống kê với các cột
+        String[] statCols = {"Chỉ số", "Giá trị"};
+        DefaultTableModel statModel = new DefaultTableModel(statCols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        JTable statTable = new JTable(statModel);
+        UIUtils.configureTable(statTable);
+        statTable.setRowHeight(30);
+        statTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        statTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        statTable.getColumnModel().getColumn(0).setPreferredWidth(300);
+        statTable.getColumnModel().getColumn(1).setPreferredWidth(200);
+        
+        // Căn giữa các ô
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        statTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
 
         btnCalc.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder();
-            sb.append("══════════════════════════════════════════════\n");
-            sb.append("         BÁO CÁO THỐNG KÊ KHÁCH SẠN\n");
-            sb.append("══════════════════════════════════════════════\n\n");
-
+            statModel.setRowCount(0);
+            
             // Doanh thu tổng
             double totalRevenue = 0;
             List<Payment> payments = paymentDAO.getAll();
             for (Payment pay : payments)
                 if ("PAID".equals(pay.getStatus())) totalRevenue += pay.getAmount();
-            sb.append(String.format("💰 TỔNG DOANH THU: %,.0f VNĐ%n%n", totalRevenue));
-
+            statModel.addRow(new Object[]{"💰 Tổng doanh thu", String.format("%,.0f VNĐ", totalRevenue)});
+            
             // Thống kê phòng
             List<Room> rooms = roomDAO.getAll();
             long totalRooms    = rooms.stream().filter(Room::isEnable).count();
             long emptyRooms    = rooms.stream().filter(r -> r.isEnable() && "EMPTY".equals(r.getStatus())).count();
             long occupiedRooms = rooms.stream().filter(r -> r.isEnable() && "OCCUPIED".equals(r.getStatus())).count();
             long maintenRooms  = rooms.stream().filter(r -> r.isEnable() && "MAINTENANCE".equals(r.getStatus())).count();
-            sb.append(String.format("🏠 PHÒNG: Tổng %d | Trống %d | Đang thuê %d | Bảo trì %d%n%n",
-                totalRooms, emptyRooms, occupiedRooms, maintenRooms));
-
+            
+            statModel.addRow(new Object[]{"🏠 Tổng số phòng", totalRooms});
+            statModel.addRow(new Object[]{"   └ Phòng trống", emptyRooms});
+            statModel.addRow(new Object[]{"   └ Đang cho thuê", occupiedRooms});
+            statModel.addRow(new Object[]{"   └ Bảo trì", maintenRooms});
+            
             // Booking stats
             List<Booking> bookings = bookingDAO.getAll();
             long checkedIn  = bookings.stream().filter(b -> "CHECKED_IN".equals(b.getStatus())).count();
             long checkedOut = bookings.stream().filter(b -> "CHECKED_OUT".equals(b.getStatus())).count();
-            sb.append(String.format("📋 BOOKING: Tổng %d | Đang thuê %d | Đã trả %d%n%n",
-                bookings.size(), checkedIn, checkedOut));
-
-            // Tần suất sử dụng phòng (top 5) - tối ưu: cache rooms thay vì gọi DB cho mỗi room
-            sb.append("📈 TOP PHÒNG ĐƯỢC THUÊ NHIỀU NHẤT:\n");
+            
+            statModel.addRow(new Object[]{"📋 Tổng booking", bookings.size()});
+            statModel.addRow(new Object[]{"   └ Đang thuê", checkedIn});
+            statModel.addRow(new Object[]{"   └ Đã trả phòng", checkedOut});
+            
+            // Tần suất sử dụng phòng (top 5)
+            statModel.addRow(new Object[]{"📈 Top phòng được thuê nhiều nhất", ""});
             java.util.Map<Integer, Long> freq = new java.util.HashMap<>();
             for (Booking b : bookings)
                 freq.merge(b.getRoomId(), 1L, Long::sum);
             
-            // Cache tất cả rooms vào map để tránh gọi DB nhiều lần
             java.util.Map<Integer, Room> roomCache = new java.util.HashMap<>();
             for (Room r : roomDAO.getAll()) {
                 roomCache.put(r.getId(), r);
@@ -782,17 +817,16 @@ public class AdminDashboard extends JFrame {
                 .limit(5)
                 .forEach(entry -> {
                     Room r = roomCache.get(entry.getKey());
-                    sb.append(String.format("  • Phòng %-6s : %d lần thuê%n",
-                        r != null ? r.getRoomNumber() : "#" + entry.getKey(), entry.getValue()));
+                    statModel.addRow(new Object[]{"   • " + (r != null ? r.getRoomNumber() : "#" + entry.getKey()), 
+                                                  entry.getValue() + " lần"});
                 });
 
-            sb.append("\n── Dịch vụ được dùng nhiều nhất ────────────\n");
+            statModel.addRow(new Object[]{"🛎 Dịch vụ được dùng nhiều nhất", ""});
             ServiceUsageDAO suD = new ServiceUsageDAO();
             java.util.Map<Integer, Long> svFreq = new java.util.HashMap<>();
             for (ServiceUsage su : suD.getAll())
                 svFreq.merge(su.getServiceId(), (long)su.getQuantity(), Long::sum);
             
-            // Cache tất cả services vào map để tránh gọi DB nhiều lần
             java.util.Map<Integer, Service> serviceCache = new java.util.HashMap<>();
             for (Service sv : serviceDAO.getAll()) {
                 serviceCache.put(sv.getId(), sv);
@@ -803,23 +837,20 @@ public class AdminDashboard extends JFrame {
                 .limit(5)
                 .forEach(entry -> {
                     Service sv = serviceCache.get(entry.getKey());
-                    sb.append(String.format("  • %-20s : %d lần%n",
-                        sv != null ? sv.getName() : "#" + entry.getKey(), entry.getValue()));
+                    statModel.addRow(new Object[]{"   • " + (sv != null ? sv.getName() : "#" + entry.getKey()), 
+                                                  entry.getValue() + " lần"});
                 });
 
-            sb.append("\n── Khách hàng ───────────────────────────────\n");
-            sb.append(String.format("  Tổng số khách: %d%n", customerDAO.getAll().size()));
-            sb.append("\n══════════════════════════════════════════════\n");
-            txtResult.setText(sb.toString());
+            statModel.addRow(new Object[]{"👥 Tổng số khách hàng", customerDAO.getAll().size()});
         });
 
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        top.add(new JLabel("  THỐNG KÊ & BÁO CÁO DOANH THU"));
+        top.add(new JLabel("  THỐNG KÊ & BÁO CÁO DOANH THU (Dạng bảng)"));
         top.add(Box.createHorizontalStrut(20));
         top.add(btnCalc);
 
         p.add(top, BorderLayout.NORTH);
-        p.add(new JScrollPane(txtResult), BorderLayout.CENTER);
+        p.add(new JScrollPane(statTable), BorderLayout.CENTER);
         return p;
     }
 

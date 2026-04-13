@@ -118,6 +118,19 @@ public class AccountDAO implements BaseDAO<Account> {
         } catch (SQLException e) { e.printStackTrace(); }
         return false;
     }
+    
+    /**
+     * Kích hoạt lại tài khoản đã bị vô hiệu hóa
+     */
+    public boolean enable(int id) {
+        try (Connection con = DBConfig.getConnection();
+             PreparedStatement ps = con.prepareStatement(
+                     "UPDATE Account SET enable = 1 WHERE id = ?")) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
+    }
 
     /**
      * Tạo admin mặc định "admin/admin" nếu bảng trống.
