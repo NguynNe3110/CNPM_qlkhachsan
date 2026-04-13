@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -737,7 +738,13 @@ public class AdminDashboard extends JFrame {
 
         loadBookingData();
 
+        JButton btnInvoice = UIUtils.makeButton("🧾 Xem hóa đơn", new Color(255, 215, 0));
         JButton btnRefresh = UIUtils.makeButton("↺ Làm mới", new Color(200, 200, 200));
+        btnInvoice.addActionListener(e -> {
+            if (!UIUtils.requireSelection(this, table)) return;
+            int bid = (int) bookingModel.getValueAt(table.getSelectedRow(), 0);
+            showBookingInvoice(bid);
+        });
         btnRefresh.addActionListener(e -> loadBookingData());
 
         // Filter combo
@@ -772,7 +779,7 @@ public class AdminDashboard extends JFrame {
         });
 
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
-        top.add(new JLabel("Lọc:")); top.add(cbFilter); top.add(btnRefresh);
+        top.add(new JLabel("Lọc:")); top.add(cbFilter); top.add(btnInvoice); top.add(btnRefresh);
 
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(15, 15, 10, 15));
@@ -825,6 +832,92 @@ public class AdminDashboard extends JFrame {
             paid ? "Đã thanh toán" : "Chưa thanh toán",
             UIUtils.translateStatus(b.getStatus())
         });
+    }
+
+    private void showBookingInvoice(int bookingId) {
+        Booking b = bookingDAO.getById(bookingId);
+        if (b == null) { UIUtils.showError(this, "Không tìm thấy booking."); return; }
+
+        Room r = roomDAO.getById(b.getRoomId());
+        Customer c = customerDAO.getById(b.getCustomerId());
+        List<ServiceUsage> usages = suDAO.getByBookingId(bookingId);
+        boolean paid = isPaymentPaid(bookingId);
+
+        StringBuilder rows = new StringBuilder();
+        double svTotal = 0;
+        for (ServiceUsage su : usages) {
+            Service sv = serviceDAO.getById(su.getServiceId());
+            if (sv != null) {
+                rows.append(String.format(
+                    "<tr><td>%s</td><td align='center'>%d</td><td align='right'>%,.0f</td></tr>",
+                    sv.getName(), su.getQuantity(), su.getPrice()));
+                svTotal += su.getPrice();
+            }
+        }
+        if (rows.length() == 0) {
+            rows.append("<tr><td colspan='3' align='center'><i>Không có dịch vụ</i></td></tr>");
+        }
+
+        int stayDays = calculateChargeableDays(b.getCheckInDate(), b.getExpectedCheckOutDate());
+        double roomTotal = (r != null ? r.getPrice() : 0) * stayDays;
+        double grandTotal = roomTotal + svTotal;
+
+        if (Math.abs(b.getTotalAmount() - grandTotal) > 0.001) {
+            b.setTotalAmount(grandTotal);
+            bookingDAO.update(b);
+        }
+
+        String html = String.format(
+            "<html><body style='font-family:Segoe UI;font-size:13px'>" +
+            "<h2 align='center'>🏨 HÓA ĐƠN THANH TOÁN</h2>" +
+            "<hr><b>Booking ID:</b> #%d &nbsp;&nbsp; <b>Trạng thái:</b> %s<br>" +
+            "<b>Phòng:</b> %s (%s) &nbsp;&nbsp; <b>Giá phòng:</b> %,.0f VNĐ<br>" +
+            "<b>Khách:</b> %s &nbsp;&nbsp; <b>SĐT:</b> %s<br>" +
+            "<b>Ngày đặt:</b> %s &nbsp;&nbsp; <b>Check-in:</b> %s<br><hr>" +
+            "<b>Chi tiết dịch vụ:</b><br>" +
+            "<table border='1' cellpadding='4' width='100%%'>" +
+            "<tr><th>Dịch vụ</th><th>SL</th><th>Thành tiền</th></tr>" +
+            "%s</table><br>" +
+            "<b>Số ngày lưu trú dự kiến:</b> %d ngày<br>" +
+            "<b>Tiền phòng:</b> %,.0f VNĐ<br>" +
+            "<b>Tiền dịch vụ:</b> %,.0f VNĐ<br>" +
+            "<hr><h3>TỔNG CỘNG: %,.0f VNĐ</h3>" +
+            "<b>Trạng thái thanh toán:</b> %s" +
+            "</body></html>",
+            b.getId(),
+            UIUtils.translateStatus(b.getStatus()),
+            r != null ? r.getRoomNumber() : "?",
+            r != null ? r.getType() : "?",
+            r != null ? r.getPrice() : 0,
+            c != null ? c.getName() : "?",
+            c != null ? c.getPhone() : "?",
+            b.getBookingDate() != null ? b.getBookingDate().format(DATE_FMT) : "N/A",
+            b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "N/A",
+            rows.toString(),
+            stayDays,
+            roomTotal,
+            svTotal,
+            grandTotal,
+            paid ? "<font color='green'>✅ ĐÃ THANH TOÁN</font>" : "<font color='red'>❌ CHƯA THANH TOÁN</font>"
+        );
+
+        JLabel label = new JLabel(html);
+        JScrollPane sp = new JScrollPane(label);
+        sp.setPreferredSize(new Dimension(520, 460));
+        JOptionPane.showMessageDialog(this, sp, "Hóa đơn - Booking #" + bookingId, JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private boolean isPaymentPaid(int bookingId) {
+        for (Payment p : paymentDAO.getAll()) {
+            if (p.getBookingId() == bookingId && "PAID".equals(p.getStatus())) return true;
+        }
+        return false;
+    }
+
+    private int calculateChargeableDays(LocalDate checkInDate, LocalDate endDate) {
+        if (checkInDate == null || endDate == null) return 1;
+        long days = ChronoUnit.DAYS.between(checkInDate, endDate);
+        return (int) Math.max(1, days);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -967,8 +1060,6 @@ public class AdminDashboard extends JFrame {
         long distinctCustomers = periodBookings.stream().map(Booking::getCustomerId).distinct().count();
         sb.append("\n── Khách hàng trong kỳ ─────────────────────\n");
         sb.append(String.format("  Tổng khách phát sinh booking: %d%n", distinctCustomers));
-        sb.append("\n══════════════════════════════════════════════\n");
-        sb.append("Ghi chú: Do bảng Payment chưa lưu ngày thanh toán, doanh thu kỳ này được tính theo ngày trả phòng (nếu có), nếu chưa có thì theo ngày đặt.\n");
         return sb.toString();
     }
 

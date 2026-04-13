@@ -8,6 +8,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import javax.swing.*;
 import javax.swing.SwingConstants;
@@ -386,7 +387,8 @@ public class StaffDashboard extends JFrame {
         Booking b = new Booking();
         b.setCustomerId(customer.getId()); b.setRoomId(room.getId());
         b.setStaffId(currentAccount.getId()); b.setStatus("CHECKED_IN");
-        b.setTotalAmount(room.getPrice());
+        int stayDays = calculateChargeableDays(LocalDate.now(), expectedCheckOut);
+        b.setTotalAmount(room.getPrice() * stayDays);
         b.setBookingDate(LocalDate.now()); b.setCheckInDate(LocalDate.now());
         b.setExpectedCheckOutDate(expectedCheckOut);
         if (bookingDAO.add(b)) {
@@ -523,6 +525,10 @@ public class StaffDashboard extends JFrame {
         }
         if (svInfo.length() == 0) svInfo.append("  (Chưa sử dụng dịch vụ nào)");
 
+        int stayDays = calculateChargeableDays(b.getCheckInDate(), b.getExpectedCheckOutDate());
+        double roomTotal = room.getPrice() * stayDays;
+        double grandTotal = roomTotal + svTotal;
+
         String msg = String.format(
             "<html><h3>📋 Thông tin thuê phòng %s</h3>" +
             "<hr><b>Phòng:</b> %s | Loại: %s | Giá: %,.0f VNĐ<br><br>" +
@@ -531,6 +537,7 @@ public class StaffDashboard extends JFrame {
             "<b>Ngày đặt:</b> %s<br>" +
             "<b>Ngày check-in:</b> %s<br><br>" +
             "<b>Dịch vụ đã dùng:</b><br>%s<br>" +
+            "<b>Số ngày lưu trú dự kiến:</b> %d ngày<br>" +
             "<b>Tổng tiền phòng:</b> %,.0f VNĐ<br>" +
             "<b>Tổng tiền dịch vụ:</b> %,.0f VNĐ<br>" +
             "<hr><b>TỔNG CỘNG: %,.0f VNĐ</b></html>",
@@ -542,8 +549,8 @@ public class StaffDashboard extends JFrame {
             b.getBookingDate() != null ? b.getBookingDate().format(DATE_FMT) : "N/A",
             b.getCheckInDate() != null ? b.getCheckInDate().format(DATE_FMT) : "N/A",
             svInfo.toString().replace("\n", "<br>"),
-            room.getPrice(), svTotal,
-            b.getTotalAmount()
+            stayDays, roomTotal, svTotal,
+            grandTotal
         );
         JOptionPane.showMessageDialog(this, msg, "Thông tin thuê phòng " + room.getRoomNumber(),
                 JOptionPane.INFORMATION_MESSAGE);
@@ -695,9 +702,11 @@ public class StaffDashboard extends JFrame {
         su.setPrice(total);
 
         if (suDAO.add(su)) {
-            // Cập nhật tổng tiền booking
-            b.setTotalAmount(b.getTotalAmount() + total);
-            bookingDAO.update(b);
+            // Cập nhật tổng tiền booking theo công thức tiền phòng/ngày * số ngày + dịch vụ
+            Room room = roomDAO.getById(b.getRoomId());
+            if (room != null) {
+                refreshBookingTotalAmount(b, room);
+            }
             loadBookingData();
             UIUtils.showInfo(this, String.format("Đã thêm: %s x%d = %,.0f VNĐ", selected.getName(), qty, total));
         } else {
@@ -729,6 +738,15 @@ public class StaffDashboard extends JFrame {
         if (rows.length() == 0)
             rows.append("<tr><td colspan='3' align='center'><i>Không có dịch vụ</i></td></tr>");
 
+        int stayDays = calculateChargeableDays(b.getCheckInDate(), b.getExpectedCheckOutDate());
+        double roomTotal = (r != null ? r.getPrice() : 0) * stayDays;
+        double grandTotal = roomTotal + svTotal;
+
+        if (Math.abs(b.getTotalAmount() - grandTotal) > 0.001) {
+            b.setTotalAmount(grandTotal);
+            bookingDAO.update(b);
+        }
+
         String html = String.format(
             "<html><body style='font-family:Segoe UI;font-size:13px'>" +
             "<h2 align='center'>🏨 HÓA ĐƠN THANH TOÁN</h2>" +
@@ -740,6 +758,7 @@ public class StaffDashboard extends JFrame {
             "<table border='1' cellpadding='4' width='100%%'>" +
             "<tr><th>Dịch vụ</th><th>SL</th><th>Thành tiền</th></tr>" +
             "%s</table><br>" +
+            "<b>Số ngày lưu trú dự kiến:</b> %d ngày<br>" +
             "<b>Tiền phòng:</b> %,.0f VNĐ<br>" +
             "<b>Tiền dịch vụ:</b> %,.0f VNĐ<br>" +
             "<hr><h3>TỔNG CỘNG: %,.0f VNĐ</h3>" +
@@ -755,9 +774,10 @@ public class StaffDashboard extends JFrame {
             b.getBookingDate() != null ? b.getBookingDate().format(DATE_FMT) : "N/A",
             b.getCheckInDate()  != null ? b.getCheckInDate().format(DATE_FMT) : "N/A",
             rows.toString(),
-            r != null ? r.getPrice() : 0,
+            stayDays,
+            roomTotal,
             svTotal,
-            b.getTotalAmount(),
+            grandTotal,
             paid ? "<font color='green'>✅ ĐÃ THANH TOÁN</font>" : "<font color='red'>❌ CHƯA THANH TOÁN</font>"
         );
 
@@ -776,6 +796,12 @@ public class StaffDashboard extends JFrame {
 
         Booking b = bookingDAO.getById(bookingId);
         if (b == null) { UIUtils.showError(this, "Không tìm thấy booking."); return; }
+
+        Room room = roomDAO.getById(b.getRoomId());
+        if (room != null) {
+            double latestTotal = refreshBookingTotalAmount(b, room);
+            b.setTotalAmount(latestTotal);
+        }
 
         String[] methods = {"Tiền mặt", "Thẻ ngân hàng", "Chuyển khoản"};
         String[] rawMethods = {"CASH", "CARD", "TRANSFER"};
@@ -822,6 +848,7 @@ public class StaffDashboard extends JFrame {
 
         b.setStatus("CHECKED_OUT");
         b.setCheckOutDate(LocalDate.now());
+        b.setActualCheckOutDate(LocalDate.now());
         bookingDAO.update(b);
 
         Room room = roomDAO.getById(b.getRoomId());
@@ -833,6 +860,29 @@ public class StaffDashboard extends JFrame {
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────
+
+    private int calculateChargeableDays(LocalDate checkInDate, LocalDate endDate) {
+        if (checkInDate == null || endDate == null) return 1;
+        long days = ChronoUnit.DAYS.between(checkInDate, endDate);
+        return (int) Math.max(1, days);
+    }
+
+    private double calculateServiceTotal(int bookingId) {
+        double total = 0;
+        for (ServiceUsage usage : suDAO.getByBookingId(bookingId)) {
+            total += usage.getPrice();
+        }
+        return total;
+    }
+
+    private double refreshBookingTotalAmount(Booking booking, Room room) {
+        int stayDays = calculateChargeableDays(booking.getCheckInDate(), booking.getExpectedCheckOutDate());
+        double roomTotal = room.getPrice() * stayDays;
+        double grandTotal = roomTotal + calculateServiceTotal(booking.getId());
+        booking.setTotalAmount(grandTotal);
+        bookingDAO.update(booking);
+        return grandTotal;
+    }
 
     /** Tạo form nhập liệu dạng label-field (3 cặp) */
     private JPanel buildForm(String l1, JComponent f1, String l2, JComponent f2, String l3, JComponent f3) {
